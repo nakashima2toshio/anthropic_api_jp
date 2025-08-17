@@ -1,0 +1,60 @@
+Memo
+python -m pip install -r requirements.txt
+
+[サンプルプログラム]
+a10_00_responses_api.py
+a10_01_structured_outputs_parse_schema.py
+a10_02_responses_tools_pydantic_parse.py
+a10_03_images_and_vision.py
+a10_04_audio_speeches.py
+a10_05_conversation_state.py
+a10_06_reasoning_chain_of_thought.py
+
+[ヘルパー関数]
+helper_api.py
+helper_st.py
+
+[その他]
+a10_get_vsid.py
+et_cities_list.py
+
+
+
+a10_00_responses_api.py
+
+TextResponseDemo - 基本テキスト応答
+MemoryResponseDemo - 会話履歴付き応答
+ImageResponseDemo - 画像入力（URL・Base64対応）
+StructuredOutputDemo - 構造化出力（create・parse対応）
+WeatherDemo - OpenWeatherMap API連携
+ToolsDemo - FileSearch・WebSearch統合
+FileSearchStandaloneDemo - FileSearch専用
+WebSearchStandaloneDemo - WebSearch専用
+ComputerUseDemo - Computer Use Tool
+ConversationStateDemo - 会話状態管理
+
+city.list.json.gz
+https://bulk.openweathermap.org/sample/
+
+# ----------------------------------------------
+
+下記仕様で設計書を作成せよ。
+不足情報があれば、指摘せよ。
+
+仕様書：
+仕様書、詳細設計書、各種、処理フローの作成
+
+概要書
+・処理の概要
+・mainの処理の流れ
+
+クラス、関数・一覧
+・列データ：　関数名, 処理概要
+
+関数の詳細設計書
+・処理概要
+・処理の流れ
+・IPO(INPUT、PROCESS、OUTPUT)
+
+----------------------------------
+

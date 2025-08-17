@@ -1,0 +1,99 @@
+# config.yml（Anthropic Claude API対応版）
+
+models:
+  default: "claude-3-5-sonnet-20241022"
+  available:
+    - "claude-3-5-sonnet-20241022"
+    - "claude-3-5-haiku-20241022"
+    - "claude-3-opus-20240229"
+    - "claude-3-sonnet-20240229"
+    - "claude-3-haiku-20240307"
+
+  categories:
+    flagship: ["claude-3-5-sonnet-20241022"]                              # 最高性能モデル
+    balanced: ["claude-3-sonnet-20240229", "claude-3-opus-20240229"]      # バランス型
+    fast: ["claude-3-5-haiku-20241022", "claude-3-haiku-20240307"]        # 高速処理
+    vision: ["claude-3-5-sonnet-20241022", "claude-3-opus-20240229"]      # 画像対応
+    coding: ["claude-3-5-sonnet-20241022", "claude-3-opus-20240229"]      # コーディング特化
+
+samples:
+  images:
+    nature: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/dd/Gfp-wisconsin-madison-the-nature-boardwalk.jpg/2560px-Gfp-wisconsin-madison-the-nature-boardwalk.jpg"
+  prompts:
+    creative_writing: "日本語で創作的な物語を書いてください。"
+    coding_help: "Pythonでデータ分析のコードを書いてください。"
+    analysis: "この画像を分析して説明してください。"
+
+# Claudeの料金設定（2025年1月現在、1000トークンあたりの価格）
+model_pricing:
+  "claude-3-5-sonnet-20241022":
+    input: 0.003   # $3/MTok
+    output: 0.015  # $15/MTok
+  "claude-3-5-haiku-20241022":
+    input: 0.00025  # $0.25/MTok  
+    output: 0.00125 # $1.25/MTok
+  "claude-3-opus-20240229":
+    input: 0.015   # $15/MTok
+    output: 0.075  # $75/MTok
+  "claude-3-sonnet-20240229":
+    input: 0.003   # $3/MTok
+    output: 0.015  # $15/MTok
+  "claude-3-haiku-20240307":
+    input: 0.00025  # $0.25/MTok
+    output: 0.00125 # $1.25/MTok
+
+# API設定
+api:
+  timeout: 30
+  max_retries: 3
+  anthropic_api_key: null  # 環境変数ANTHROPIC_API_KEYから取得
+  message_limit: 50
+
+# UI設定
+ui:
+  page_title: "Anthropic API Demo"
+  page_icon: "🤖"
+  layout: "wide"
+  text_area_height: 75
+
+# キャッシュ設定
+cache:
+  enabled: true
+  ttl: 3600
+  max_size: 100
+
+# ログ設定
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: null
+  max_bytes: 10485760
+  backup_count: 5
+
+# エラーメッセージ
+error_messages:
+  ja:
+    general_error: "エラーが発生しました"
+    api_key_missing: "Anthropic APIキーが設定されていません"
+    network_error: "ネットワークエラーが発生しました"
+
+# デフォルトメッセージ
+default_messages:
+  developer: "You are a helpful assistant specialized in software development."
+  user: "Please help me with my software development tasks."
+  assistant: "I'll help you with your software development needs."
+  system: "You are a helpful assistant specialized in software development."
+
+# 実験的機能
+experimental:
+  debug_mode: false
+  performance_monitoring: true
+
+# パス設定
+paths:
+  logs_dir: "logs"
+  data_dir: "data"
+
+# 国際化
+i18n:
+  default_language: "ja"
