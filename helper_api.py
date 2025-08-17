@@ -121,8 +121,8 @@ class ConfigManager:
         """デフォルト設定（フォールバック用）"""
         return {
             "models"          : {
-                "default"  : "claude-3-5-sonnet-20241022",
-                "available": ["claude-3-5-sonnet-20241022", "claude-3-5-haiku-20241022", "claude-3-opus-20240229"]
+                "default"  : "claude-sonnet-4-20250514",
+                "available": ["claude-opus-4-1-20250805", "claude-sonnet-4-20250514", "claude-3-5-sonnet-20241022", "claude-3-5-haiku-20241022", "claude-3-opus-20240229"]
             },
             "api"             : {
                 "timeout"       : 30,
@@ -161,8 +161,13 @@ class ConfigManager:
                 "assistant": "I'll help you with your software development needs."
             },
             "model_pricing"   : {
+                # Claude 4 Family (2025年最新)
+                "claude-opus-4-1-20250805": {"input": 0.015, "output": 0.075},
+                "claude-sonnet-4-20250514": {"input": 0.003, "output": 0.015},
+                # Claude 3.5 Family (廃止予定: 2025年10月22日)
                 "claude-3-5-sonnet-20241022": {"input": 0.003, "output": 0.015},
                 "claude-3-5-haiku-20241022": {"input": 0.00025, "output": 0.00125},
+                # Claude 3 Family (レガシー)
                 "claude-3-opus-20240229": {"input": 0.015, "output": 0.075}
             },
             "experimental"    : {
@@ -498,8 +503,13 @@ class TokenManager:
 
     # モデル別のエンコーディング対応表（Anthropic Claude用）
     MODEL_ENCODINGS = {
+        # Claude 4 Family (2025年最新)
+        "claude-opus-4-1-20250805"   : "cl100k_base",
+        "claude-sonnet-4-20250514"   : "cl100k_base",
+        # Claude 3.5 Family
         "claude-3-5-sonnet-20241022" : "cl100k_base",
         "claude-3-5-haiku-20241022"  : "cl100k_base", 
+        # Claude 3 Family
         "claude-3-opus-20240229"     : "cl100k_base",
         "claude-3-sonnet-20240229"   : "cl100k_base",
         "claude-3-haiku-20240307"    : "cl100k_base",
@@ -509,7 +519,7 @@ class TokenManager:
     def count_tokens(cls, text: str, model: str = None) -> int:
         """テキストのトークン数をカウント"""
         if model is None:
-            model = config.get("models.default", "claude-3-5-sonnet-20241022")
+            model = config.get("models.default", "claude-sonnet-4-20250514")
 
         try:
             encoding_name = cls.MODEL_ENCODINGS.get(model, "cl100k_base")
@@ -524,7 +534,7 @@ class TokenManager:
     def truncate_text(cls, text: str, max_tokens: int, model: str = None) -> str:
         """テキストを指定トークン数に切り詰め"""
         if model is None:
-            model = config.get("models.default", "claude-3-5-sonnet-20241022")
+            model = config.get("models.default", "claude-sonnet-4-20250514")
 
         try:
             encoding_name = cls.MODEL_ENCODINGS.get(model, "cl100k_base")
@@ -542,7 +552,7 @@ class TokenManager:
     def estimate_cost(cls, input_tokens: int, output_tokens: int, model: str = None) -> float:
         """API使用コストの推定（config.ymlから料金取得）"""
         if model is None:
-            model = config.get("models.default", "claude-3-5-sonnet-20241022")
+            model = config.get("models.default", "claude-sonnet-4-20250514")
 
         pricing = config.get("model_pricing", {})
         model_pricing = pricing.get(model)
@@ -683,7 +693,7 @@ class AnthropicClient:
     ) -> Message:
         """Anthropic Messages API呼び出し"""
         if model is None:
-            model = config.get("models.default", "claude-3-5-sonnet-20241022")
+            model = config.get("models.default", "claude-sonnet-4-20250514")
 
         if messages is None:
             raise ValueError("messages must be provided")
@@ -715,7 +725,7 @@ class AnthropicClient:
     ) -> Message:
         """Anthropic Messages API呼び出し（ツール使用対応）"""
         if model is None:
-            model = config.get("models.default", "claude-3-5-sonnet-20241022")
+            model = config.get("models.default", "claude-sonnet-4-20250514")
 
         if messages is None:
             raise ValueError("messages must be provided")
@@ -749,7 +759,7 @@ class AnthropicClient:
     ):
         """Anthropic Messages API呼び出し（ストリーミング）"""
         if model is None:
-            model = config.get("models.default", "claude-3-5-sonnet-20241022")
+            model = config.get("models.default", "claude-sonnet-4-20250514")
 
         if messages is None:
             raise ValueError("messages must be provided")

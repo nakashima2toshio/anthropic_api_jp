@@ -138,14 +138,14 @@ class BaseDemo(ABC):
         if session_key not in st.session_state:
             st.session_state[session_key] = {
                 'initialized'    : True,
-                'model'          : self.config.get("models.default", "claude-3-5-sonnet-20241022"),
+                'model'          : self.config.get("models.default", "claude-sonnet-4-20250514"),
                 'execution_count': 0
             }
 
     def get_model(self) -> str:
         """選択されたモデルを取得（統一化）"""
         return st.session_state.get(f"model_{self.safe_key}",
-                                    config.get("models.default", "claude-3-5-sonnet-20241022"))
+                                    config.get("models.default", "claude-sonnet-4-20250514"))
 
     def is_reasoning_model(self, model: str = None) -> bool:
         """推論系モデルかどうかを判定（統一化）"""
