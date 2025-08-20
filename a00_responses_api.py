@@ -1,4 +1,4 @@
-# streamlit run a10_00_responses_api.py --server.port=8510
+# streamlit run a00_responses_api.py --server.port=8510
 # --------------------------------------------------
 # Anthropic API デモアプリケーション（統一化版）
 # Streamlitを使用したインタラクティブなAPIテストツール
@@ -2493,5 +2493,5 @@ def main():
 if __name__ == "__main__":
     main()
 
-# streamlit run a10_00_responses_api.py --server.port=8510
+# streamlit run a00_responses_api.py --server.port=8510
 

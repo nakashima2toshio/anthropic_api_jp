@@ -1,4 +1,4 @@
-# streamlit run a10_05_conversation_state.py --server.port=8505
+# streamlit run a05_conversation_state.py --server.port=8505
 # --------------------------------------------------
 # OpenAI 会話状態管理デモアプリケーション（統一化版）
 # Streamlitを使用したインタラクティブなAPIテストツール
@@ -651,4 +651,4 @@ def main():
 if __name__ == "__main__":
     main()
 
-# streamlit run a10_05_conversation_state.py --server.port=8505
+# streamlit run a05_conversation_state.py --server.port=8505

@@ -1,4 +1,4 @@
-# streamlit run a10_03_images_and_vision.py --server.port=8503
+# streamlit run a03_images_and_vision.py --server.port=8503
 # --------------------------------------------------
 # OpenAI 画像＆ビジョンAPI デモアプリケーション（統一化版）
 # Streamlitを使用したインタラクティブなAPIテストツール
@@ -569,4 +569,4 @@ def main():
 if __name__ == "__main__":
     main()
 
-# streamlit run a10_03_images_and_vision.py --server.port=8503
+# streamlit run a03_images_and_vision.py --server.port=8503

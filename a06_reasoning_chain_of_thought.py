@@ -1,4 +1,4 @@
-# streamlit run a10_06_reasoning_chain_of_thought.py --server.port=8506
+# streamlit run a06_reasoning_chain_of_thought.py --server.port=8506
 # --------------------------------------------------
 # OpenAI Chain of Thought 推論パターンデモアプリケーション（統一化版）
 # Streamlitを使用したインタラクティブなAPIテストツール
@@ -898,4 +898,4 @@ def main():
 if __name__ == "__main__":
     main()
 
-# streamlit run a10_06_reasoning_chain_of_thought.py --server.port=8506
+# streamlit run a06_reasoning_chain_of_thought.py --server.port=8506

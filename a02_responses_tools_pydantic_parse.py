@@ -1,4 +1,4 @@
-# streamlit run a10_02_responses_tools_pydantic_parse.py --server.port=8502
+# streamlit run a02_responses_tools_pydantic_parse.py --server.port=8502
 # pip install --upgrade openai
 # ---------------------------------------------------- 情報：
 # https://cookbook.openai.com/examples/structured_outputs_intro
@@ -1246,4 +1246,4 @@ def main():
 if __name__ == "__main__":
     main()
 
-# streamlit run a10_02_responses_tools_pydantic_parse.py --server.port=8502
+# streamlit run a02_responses_tools_pydantic_parse.py --server.port=8502

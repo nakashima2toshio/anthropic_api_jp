@@ -1,4 +1,4 @@
-# streamlit run a10_04_audio_speeches.py --server.port=8504
+# streamlit run a04_audio_speeches.py --server.port=8504
 # --------------------------------------------------
 # OpenAI Audio & Speech API デモアプリケーション（統一化改修版）
 # Streamlitを使用したインタラクティブな音声APIテストツール
@@ -970,4 +970,4 @@ def main():
 if __name__ == "__main__":
     main()
 
-# streamlit run a10_04_audio_speeches.py --server.port=8504
+# streamlit run a04_audio_speeches.py --server.port=8504

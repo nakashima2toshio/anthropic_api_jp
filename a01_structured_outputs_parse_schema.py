@@ -1,4 +1,4 @@
-# streamlit run a10_01_structured_outputs_parse_schema.py --server.port=8501
+# streamlit run a01_structured_outputs_parse_schema.py --server.port=8501
 # --------------------------------------------------
 # OpenAI Structured Outputs Parse Schema デモアプリケーション（統一化版）
 # Streamlitを使用したインタラクティブなAPIテストツール
@@ -1126,4 +1126,4 @@ def main():
 if __name__ == "__main__":
     main()
 
-# streamlit run a10_01_structured_outputs_parse_schema.py --server.port=8501
+# streamlit run a01_structured_outputs_parse_schema.py --server.port=8501
