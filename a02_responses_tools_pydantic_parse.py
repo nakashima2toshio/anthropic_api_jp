@@ -51,7 +51,7 @@ except ImportError as e:
 
 # ページ設定（一度だけ実行）
 st.set_page_config(
-    page_title=config.get("ui.page_title", "OpenAI Tools & Pydantic Parse Demo"),
+    page_title=config.get("ui.page_title", "Anthropic Tools & Pydantic Parse Demo"),
     page_icon=config.get("ui.page_icon", "🛠️"),
     layout=config.get("ui.layout", "wide")
 )
@@ -1159,7 +1159,7 @@ class DemoManager:
 
         # デモ選択
         demo_name = st.sidebar.radio(
-            "デモを選択",
+            "[a02_responses_tools_pydantic_parse.py] デモを選択",
             list(self.demos.keys()),
             key="demo_selection"
         )
@@ -1200,12 +1200,12 @@ class DemoManager:
 
         # バージョン情報
         st.sidebar.markdown("### バージョン")
-        st.sidebar.markdown("- OpenAI Tools & Pydantic Parse Demo v1.0")
+        st.sidebar.markdown("- Anthropic Tools & Pydantic Parse Demo v1.0")
         st.sidebar.markdown("- Streamlit " + st.__version__)
 
         # リンク
         st.sidebar.markdown("### リンク")
-        st.sidebar.markdown("[OpenAI API ドキュメント](https://platform.openai.com/docs)")
+        st.sidebar.markdown("[Anthropic API ドキュメント](https://docs.anthropic.com/claude)")
         st.sidebar.markdown("[Streamlit ドキュメント](https://docs.streamlit.io)")
 
 
@@ -1222,9 +1222,9 @@ def main():
     )
 
     # (2) 環境変数のチェック
-    if not os.getenv("OPENAI_API_KEY"):
-        st.error("環境変数 OPENAI_API_KEY が設定されていません。")
-        st.info("export OPENAI_API_KEY='your-api-key' を実行してください。")
+    if not os.getenv("ANTHROPIC_API_KEY"):
+        st.error("環境変数 ANTHROPIC_API_KEY が設定されていません。")
+        st.info("export ANTHROPIC_API_KEY='your-api-key' を実行してください。")
         st.stop()
 
     # OPENWEATHER_API_KEY の警告（オプション）

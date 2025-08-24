@@ -2404,7 +2404,7 @@ class DemoManager:
 
         # デモ選択
         demo_name = st.sidebar.radio(
-            "デモを選択",
+            "[a00_responses_api.py] デモを選択",
             list(self.demos.keys()),
             key="demo_selection"
         )
@@ -2440,12 +2440,12 @@ class DemoManager:
 
         # バージョン情報
         st.sidebar.markdown("### バージョン")
-        st.sidebar.markdown("- OpenAI Responses API Demo v3.0 (統一化版)")
+        st.sidebar.markdown("- Anthropic Responses API Demo v3.0 (統一化版)")
         st.sidebar.markdown("- Streamlit " + st.__version__)
 
         # リンク
         st.sidebar.markdown("### リンク")
-        st.sidebar.markdown("[OpenAI API ドキュメント](https://platform.openai.com/docs)")
+        st.sidebar.markdown("[Anthropic API ドキュメント](https://docs.anthropic.com/claude)")
         st.sidebar.markdown("[Streamlit ドキュメント](https://docs.streamlit.io)")
 
         # 統計情報
@@ -2468,9 +2468,9 @@ def main():
         )
 
         # 環境変数のチェック
-        if not os.getenv("OPENAI_API_KEY"):
-            st.error("環境変数 OPENAI_API_KEY が設定されていません。")
-            st.info("export OPENAI_API_KEY='your-api-key' を実行してください。")
+        if not os.getenv("ANTHROPIC_API_KEY"):
+            st.error("環境変数 ANTHROPIC_API_KEY が設定されていません。")
+            st.info("export ANTHROPIC_API_KEY='your-api-key' を実行してください。")
             st.stop()
 
         # セッション状態の初期化（統一化）

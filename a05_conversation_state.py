@@ -19,7 +19,7 @@ import streamlit as st
 import pandas as pd
 from pydantic import BaseModel, Field, ValidationError
 
-from openai import OpenAI
+from anthropic import Anthropic
 from openai.types.responses import (
     EasyInputMessageParam,
     ResponseInputTextParam,
@@ -48,7 +48,7 @@ try:
         InfoPanelManager, safe_streamlit_json
     )
     from helper_api import (
-        config, logger, TokenManager, OpenAIClient,
+        config, logger, TokenManager, AnthropicClient,
         EasyInputMessageParam, ResponseInputTextParam,
         ConfigManager, MessageManager, sanitize_key,
         error_handler, timer, get_default_messages,
@@ -65,7 +65,7 @@ def setup_page_config():
     """ページ設定（重複実行エラー回避）"""
     try:
         st.set_page_config(
-            page_title=config.get("ui.page_title", "OpenAI 会話状態管理デモ"),
+            page_title=config.get("ui.page_title", "Anthropic 会話状態管理デモ"),
             page_icon=config.get("ui.page_icon", "🔄"),
             layout=config.get("ui.layout", "wide"),
             initial_sidebar_state="expanded"
@@ -129,11 +129,11 @@ class BaseDemo(ABC):
         # 共通UI設定
         setup_common_ui(self.demo_name, selected_model)
         
-        # OpenAIクライアントの初期化
+        # Anthropicクライアントの初期化
         try:
-            self.client = OpenAI()
+            self.client = Anthropic()
         except Exception as e:
-            st.error(f"OpenAIクライアントの初期化に失敗しました: {e}")
+            st.error(f"Anthropicクライアントの初期化に失敗しました: {e}")
             return
         
         # デモ実行
@@ -155,7 +155,7 @@ class StatefulConversationDemo(BaseDemo):
         with st.expander("📋 実装例コード", expanded=False):
             st.code("""
 # ステートフルな会話継続の実装例
-from openai import OpenAI
+from anthropic import Anthropic
 from openai.types.responses import EasyInputMessageParam, ResponseInputTextParam
 
 client = OpenAI()
@@ -169,7 +169,7 @@ initial_response = client.responses.create(
             content=[
                 ResponseInputTextParam(
                     type="input_text", 
-                    text="OpenAI APIの使い方を教えて"
+                    text="Anthropic APIの使い方を教えて"
                 )
             ]
         )
@@ -190,7 +190,7 @@ follow_up_response = client.responses.create(
         # 初回質問
         initial_question = st.text_area(
             "初回の質問",
-            value="OpenAI APIの使い方を教えて",
+            value="Anthropic APIの使い方を教えて",
             height=config.get("ui.text_area_height", 75),
             key=f"initial_question_{self.safe_key}"
         )
@@ -298,7 +298,7 @@ class WebSearchParseDemo(BaseDemo):
         with st.expander("📋 実装例コード", expanded=False):
             st.code("""
 # Web検索と構造化パースの実装例
-from openai import OpenAI
+from anthropic import Anthropic
 from openai.types.responses import WebSearchToolParam
 from pydantic import BaseModel, Field
 
@@ -308,7 +308,7 @@ client = OpenAI()
 tool = {"type": "web_search_preview"}
 search_response = client.responses.create(
     model=model,
-    input="最新のOpenAI APIの情報は？",
+    input="最新のAnthropic APIの情報は？",
     tools=[tool]
 )
 
@@ -422,7 +422,7 @@ class FunctionCallingDemo(BaseDemo):
         with st.expander("📋 実装例コード", expanded=False):
             st.code("""
 # Function Callingの実装例
-from openai import OpenAI
+from anthropic import Anthropic
 from openai.types.responses import FunctionToolParam
 from pydantic import BaseModel, Field
 import requests
@@ -627,7 +627,7 @@ def main():
     with st.sidebar:
         # 1. デモ選択
         demo_name = st.radio(
-            "デモを選択",
+            "[a05_conversation_state.py] デモを選択",
             demo_manager.get_demo_list(),
             key="demo_selection"
         )

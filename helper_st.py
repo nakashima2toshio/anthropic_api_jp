@@ -1,5 +1,6 @@
-# helper_st.py
-# Streamlit UI関連機能
+# helper_st.py - Anthropic API専用版
+# Streamlit UI関連機能（Anthropic API専用）
+# openai_helper_st.py を参考にしたAnthropic API専用の実装
 # -----------------------------------------
 from functools import wraps
 from typing import List, Dict, Any, Optional, Union, Tuple
@@ -15,10 +16,8 @@ import streamlit as st
 # Anthropic APIの型をインポート
 from anthropic.types import Message, MessageParam, ContentBlock, TextBlock
 
-# 後方互換性のための型エイリアス  
+# Anthropic API専用の型エイリアス  
 EasyInputMessageParam = MessageParam
-ResponseInputTextParam = dict  # TextBlock相当
-ResponseInputImageParam = dict  # ImageBlock相当
 Response = Message
 
 # helper_api.pyから必要な機能をインポート
@@ -276,7 +275,7 @@ class UIHelper:
         if title is None:
             title = config.get("ui.page_title", "OpenAI API Demo")
         if sidebar_title is None:
-            sidebar_title = "responses.parse-サンプル"
+            sidebar_title = "Anthropic API デモ"
 
         # Streamlit設定
         page_config = {
@@ -828,17 +827,18 @@ def extract_text_from_response(response: Response) -> List[str]:
     return ResponseProcessor.extract_text(response)
 
 
-def append_user_message(append_text: str, image_url: Optional[str] = None) -> List[EasyInputMessageParam]:
-    """後方互換性のための関数"""
+def append_user_message(append_text: str, image_data: Optional[Dict] = None) -> List[EasyInputMessageParam]:
+    """後方互換性のための関数（Anthropic API用）"""
     messages = get_default_messages()
-    if image_url:
+    if image_data:
+        # Anthropic API形式の画像コンテンツ
         content = [
-            ResponseInputTextParam(type="input_text", text=append_text),
-            ResponseInputImageParam(type="input_image", image_url=image_url, detail="auto")
+            {"type": "text", "text": append_text},
+            {"type": "image", "source": image_data}
         ]
-        messages.append(EasyInputMessageParam(role="user", content=content))
+        messages.append({"role": "user", "content": content})
     else:
-        messages.append(EasyInputMessageParam(role="user", content=append_text))
+        messages.append({"role": "user", "content": append_text})
     return messages
 
 # ==================================================

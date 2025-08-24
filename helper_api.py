@@ -1,4 +1,5 @@
-# helper_api.py - 改修版（Anthropic API対応）
+# helper_api.py - Anthropic API専用版
+# OpenAI helper_api.py を参考にしたAnthropic API専用の実装
 from typing import List, Dict, Any, Optional, Union, Tuple, Literal, Callable
 from pathlib import Path
 from dataclasses import dataclass
@@ -23,7 +24,6 @@ from anthropic import Anthropic
 # Anthropic API型定義
 # -----------------------------------------------------
 from anthropic.types import Message, MessageParam, ContentBlock, TextBlock
-from anthropic import HUMAN_PROMPT, AI_PROMPT
 
 # Role型の定義
 RoleType = Literal["user", "assistant", "system"]
@@ -108,6 +108,10 @@ class ConfigManager:
         # Anthropic API Key
         if os.getenv("ANTHROPIC_API_KEY"):
             config.setdefault("api", {})["anthropic_api_key"] = os.getenv("ANTHROPIC_API_KEY")
+        
+        # 追加の環境変数対応
+        if os.getenv("ANTHROPIC_API_BASE"):
+            config.setdefault("api", {})["anthropic_api_base"] = os.getenv("ANTHROPIC_API_BASE")
 
         # ログレベル
         if os.getenv("LOG_LEVEL"):
@@ -125,10 +129,11 @@ class ConfigManager:
                 "available": ["claude-opus-4-1-20250805", "claude-sonnet-4-20250514", "claude-3-5-sonnet-20241022", "claude-3-5-haiku-20241022", "claude-3-opus-20240229"]
             },
             "api"             : {
-                "timeout"       : 30,
-                "max_retries"   : 3,
-                "anthropic_api_key": None,
-                "message_limit" : 50
+                "timeout"           : 30,
+                "max_retries"       : 3,
+                "anthropic_api_key" : None,
+                "anthropic_api_base": None,
+                "message_limit"     : 50
             },
             "ui"              : {
                 "page_title"      : "Anthropic API Demo",
@@ -667,9 +672,12 @@ class ResponseProcessor:
 class AnthropicClient:
     """Anthropic API クライアント"""
 
-    def __init__(self, api_key: str = None):
+    def __init__(self, api_key: str = None, api_base: str = None):
         if api_key is None:
             api_key = config.get("api.anthropic_api_key") or os.getenv("ANTHROPIC_API_KEY")
+            
+        if api_base is None:
+            api_base = config.get("api.anthropic_api_base") or os.getenv("ANTHROPIC_API_BASE")
 
         if not api_key:
             # エラーメッセージを多言語対応
@@ -678,7 +686,11 @@ class AnthropicClient:
                                    "Anthropic APIキーが設定されていません")
             raise ValueError(error_msg)
 
-        self.client = Anthropic(api_key=api_key)
+        client_kwargs = {"api_key": api_key}
+        if api_base:
+            client_kwargs["base_url"] = api_base
+            
+        self.client = Anthropic(**client_kwargs)
 
     @error_handler
     @timer

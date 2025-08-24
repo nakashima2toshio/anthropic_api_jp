@@ -1,6 +1,6 @@
 # streamlit run a06_reasoning_chain_of_thought.py --server.port=8506
 # --------------------------------------------------
-# OpenAI Chain of Thought 推論パターンデモアプリケーション（統一化版）
+# Anthropic Chain of Thought 推論パターンデモアプリケーション（統一化版）
 # Streamlitを使用したインタラクティブなAPIテストツール
 # 統一化版: a10_00_responses_api.pyの構成・構造・ライブラリ・エラー処理の完全統一
 # --------------------------------------------------
@@ -18,7 +18,7 @@ import streamlit as st
 import pandas as pd
 from pydantic import BaseModel, Field, ValidationError
 
-from openai import OpenAI
+from anthropic import Anthropic
 from openai.types.responses import (
     EasyInputMessageParam,
     ResponseInputTextParam,
@@ -46,7 +46,7 @@ try:
         InfoPanelManager, safe_streamlit_json
     )
     from helper_api import (
-        config, logger, TokenManager, OpenAIClient,
+        config, logger, TokenManager, AnthropicClient,
         EasyInputMessageParam, ResponseInputTextParam,
         ConfigManager, MessageManager, sanitize_key,
         error_handler, timer, get_default_messages,
@@ -63,7 +63,7 @@ def setup_page_config():
     """ページ設定（重複実行エラー回避）"""
     try:
         st.set_page_config(
-            page_title=config.get("ui.page_title", "OpenAI Chain of Thought 推論パターンデモ"),
+            page_title=config.get("ui.page_title", "Anthropic Chain of Thought 推論パターンデモ"),
             page_icon=config.get("ui.page_icon", "🧠"),
             layout=config.get("ui.layout", "wide"),
             initial_sidebar_state="expanded"
@@ -177,11 +177,11 @@ class BaseDemo(ABC):
         # 共通UI設定
         setup_common_ui(self.demo_name, selected_model)
         
-        # OpenAIクライアントの初期化
+        # Anthropicクライアントの初期化
         try:
-            self.client = OpenAI()
+            self.client = Anthropic()
         except Exception as e:
-            st.error(f"OpenAIクライアントの初期化に失敗しました: {e}")
+            st.error(f"Anthropicクライアントの初期化に失敗しました: {e}")
             return
         
         # デモ実行
@@ -203,7 +203,7 @@ class StepByStepReasoningDemo(BaseDemo):
         with st.expander("📋 実装例コード", expanded=False):
             st.code("""
 # Step-by-Step 推論の実装例
-from openai import OpenAI
+from anthropic import Anthropic
 from openai.types.responses import EasyInputMessageParam, ResponseInputTextParam
 
 client = OpenAI()
@@ -313,7 +313,7 @@ class HypothesisTestDemo(BaseDemo):
         with st.expander("📋 実装例コード", expanded=False):
             st.code("""
 # 仮説検証推論の実装例
-from openai import OpenAI
+from anthropic import Anthropic
 from openai.types.responses import EasyInputMessageParam, ResponseInputTextParam
 
 client = OpenAI()
@@ -439,7 +439,7 @@ class TreeOfThoughtDemo(BaseDemo):
         with st.expander("📋 実装例コード", expanded=False):
             st.code("""
 # Tree of Thought 推論の実装例
-from openai import OpenAI
+from anthropic import Anthropic
 from openai.types.responses import EasyInputMessageParam, ResponseInputTextParam
 
 client = OpenAI()
@@ -567,7 +567,7 @@ class ProsConsDecisionDemo(BaseDemo):
         with st.expander("📋 実装例コード", expanded=False):
             st.code("""
 # Pros-Cons-Decision 推論の実装例
-from openai import OpenAI
+from anthropic import Anthropic
 from openai.types.responses import EasyInputMessageParam, ResponseInputTextParam
 
 client = OpenAI()
@@ -704,7 +704,7 @@ class PlanExecuteReflectDemo(BaseDemo):
         with st.expander("📋 実装例コード", expanded=False):
             st.code("""
 # Plan-Execute-Reflect 推論の実装例
-from openai import OpenAI
+from anthropic import Anthropic
 from openai.types.responses import EasyInputMessageParam, ResponseInputTextParam
 
 client = OpenAI()
@@ -874,7 +874,7 @@ def main():
     with st.sidebar:
         # 1. デモ選択
         demo_name = st.radio(
-            "デモを選択",
+            "[a06_reasoning_chain_of_thought.py] デモ選択",
             demo_manager.get_demo_list(),
             key="demo_selection"
         )

@@ -1,6 +1,6 @@
 # streamlit run a04_audio_speeches.py --server.port=8504
 # --------------------------------------------------
-# OpenAI Audio & Speech API デモアプリケーション（統一化改修版）
+# Anthropic Audio & Speech API デモアプリケーション（統一化改修版）
 # Streamlitを使用したインタラクティブな音声APIテストツール
 # 統一化改修版: a10_00_responses_api.pyの構成・構造・ライブラリ・エラー処理の完全統一
 # --------------------------------------------------
@@ -36,7 +36,7 @@ try:
         safe_streamlit_json,
     )
     from helper_api import (
-        config, logger, TokenManager, OpenAIClient,
+        config, logger, TokenManager, AnthropicClient,
         EasyInputMessageParam, ResponseInputTextParam,
         ConfigManager, MessageManager, sanitize_key,
         error_handler, timer, get_default_messages,
@@ -47,7 +47,7 @@ except ImportError as e:
     st.info("必要なファイルが存在することを確認してください: helper_st.py, helper_api.py")
     st.stop()
 
-from openai import OpenAI, AsyncOpenAI
+from anthropic import Anthropic, AsyncAnthropic
 from openai.types.chat import (
     ChatCompletionSystemMessageParam,
     ChatCompletionUserMessageParam,
@@ -59,7 +59,7 @@ def setup_page_config():
     """ページ設定（重複実行エラー回避）"""
     try:
         st.set_page_config(
-            page_title=config.get("ui.page_title", "OpenAI Audio & Speech API Demo"),
+            page_title=config.get("ui.page_title", "Anthropic Audio & Speech API Demo"),
             page_icon=config.get("ui.page_icon", "🎵"),
             layout=config.get("ui.layout", "wide"),
             initial_sidebar_state="expanded"
@@ -117,7 +117,7 @@ class UIHelper(BaseUIHelper):
             audio_models,
             index=default_index,
             key=key,
-            help="利用するOpenAI音声モデルを選択してください",
+            help="利用するAnthropic音声モデルを選択してください",
         )
         SessionStateManager.set_user_preference("selected_audio_model", selected)
         return selected
@@ -211,11 +211,11 @@ class BaseDemo(ABC):
         self.demo_name = demo_name
         self.config = ConfigManager("config.yml")
         try:
-            self.client = OpenAIClient()
-            self.openai_client = OpenAI()
-            self.async_client = AsyncOpenAI()
+            self.client = AnthropicClient()
+            self.anthropic_client = Anthropic()
+            self.async_client = AsyncAnthropic()
         except Exception as e:
-            st.error(f"OpenAIクライアントの初期化に失敗しました: {e}")
+            st.error(f"Anthropicクライアントの初期化に失敗しました: {e}")
             st.stop()
 
         self.safe_key = sanitize_key(demo_name)
@@ -280,7 +280,7 @@ class TextToSpeechDemo(BaseDemo):
     def run(self):
         self.initialize()
 
-        with st.expander("OpenAI Audio API:実装例", expanded=False):
+        with st.expander("Anthropic Audio API:実装例", expanded=False):
             st.write("テキストを音声に変換するTTSデモ。ストリーミング保存でMP3出力。")
             st.code(textwrap.dedent("""\
         # Text to Speech API 使用例
@@ -388,7 +388,7 @@ class SpeechToTextDemo(BaseDemo):
     def run(self):
         self.initialize()
 
-        with st.expander("OpenAI Audio API:実装例", expanded=False):
+        with st.expander("Anthropic Audio API:実装例", expanded=False):
             st.write("音声ファイルをテキストに変換するSTTデモ。")
             st.code(textwrap.dedent("""\
                 # Speech to Text API 使用例
@@ -490,7 +490,7 @@ class SpeechTranslationDemo(BaseDemo):
     def run(self):
         self.initialize()
 
-        with st.expander("OpenAI Audio API:実装例", expanded=False):
+        with st.expander("Anthropic Audio API:実装例", expanded=False):
             st.write("音声ファイルを英語テキストに翻訳。英訳されない場合はChatで英訳フォールバック。")
             st.code(textwrap.dedent("""\
                 # Speech Translation API 使用例
@@ -731,7 +731,7 @@ class ChainedVoiceAgentDemo(BaseDemo):
     def run(self):
         self.initialize()
 
-        with st.expander("OpenAI Audio API:実装例", expanded=False):
+        with st.expander("Anthropic Audio API:実装例", expanded=False):
             st.write("音声→テキスト→Chat→音声の連鎖処理デモ。")
             st.code('''# Chained Voice Agent処理例
 def voice_agent_chain(audio_bytes):
@@ -940,11 +940,11 @@ class AudioDemoManager:
             })
 
         st.sidebar.markdown("### バージョン")
-        st.sidebar.markdown("- OpenAI Audio & Speech Demo v3.1 (統一化版)")
+        st.sidebar.markdown("- Anthropic Audio & Speech Demo v3.1 (統一化版)")
         st.sidebar.markdown("- Streamlit " + st.__version__)
         st.sidebar.markdown("### リンク")
-        st.sidebar.markdown("[OpenAI Audio API](https://platform.openai.com/docs/guides/speech-to-text)")
-        st.sidebar.markdown("[Realtime API](https://platform.openai.com/docs/guides/realtime)")
+        st.sidebar.markdown("[Anthropic Audio API](https://docs.anthropic.com/claude)")
+        st.sidebar.markdown("[Realtime API](https://docs.anthropic.com/claude)")
 
 # ==================================================
 # メイン関数（統一化版）
@@ -952,9 +952,9 @@ class AudioDemoManager:
 def main():
     try:
         logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-        if not os.getenv("OPENAI_API_KEY"):
-            st.error("環境変数 OPENAI_API_KEY が設定されていません。")
-            st.info("export OPENAI_API_KEY='your-api-key' を実行してください。")
+        if not os.getenv("ANTHROPIC_API_KEY"):
+            st.error("環境変数 ANTHROPIC_API_KEY が設定されていません。")
+            st.info("export ANTHROPIC_API_KEY='your-api-key' を実行してください。")
             st.stop()
 
         SessionStateManager.init_session_state()

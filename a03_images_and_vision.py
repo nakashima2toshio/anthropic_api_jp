@@ -1,6 +1,6 @@
 # streamlit run a03_images_and_vision.py --server.port=8503
 # --------------------------------------------------
-# OpenAI 画像＆ビジョンAPI デモアプリケーション（統一化版）
+# Anthropic 画像＆ビジョンAPI デモアプリケーション（統一化版）
 # Streamlitを使用したインタラクティブなAPIテストツール
 # 統一化版: a10_00_responses_api.pyの構成・構造・ライブラリ・エラー処理の完全統一
 # --------------------------------------------------
@@ -19,7 +19,7 @@ import streamlit as st
 import pandas as pd
 from pydantic import BaseModel, Field, ValidationError
 
-from openai import OpenAI
+from anthropic import Anthropic
 from openai.types.responses import (
     EasyInputMessageParam,
     ResponseInputTextParam,
@@ -47,7 +47,7 @@ try:
         InfoPanelManager, safe_streamlit_json
     )
     from helper_api import (
-        config, logger, TokenManager, OpenAIClient,
+        config, logger, TokenManager, AnthropicClient,
         EasyInputMessageParam, ResponseInputTextParam,
         ConfigManager, MessageManager, sanitize_key,
         error_handler, timer, get_default_messages,
@@ -64,7 +64,7 @@ def setup_page_config():
     """ページ設定（重複実行エラー回避）"""
     try:
         st.set_page_config(
-            page_title=config.get("ui.page_title", "OpenAI 画像＆ビジョンAPI デモ"),
+            page_title=config.get("ui.page_title", "Anthropic 画像＆ビジョンAPI デモ"),
             page_icon=config.get("ui.page_icon", "🖼️"),
             layout=config.get("ui.layout", "wide"),
             initial_sidebar_state="expanded"
@@ -136,11 +136,11 @@ class BaseDemo(ABC):
         # 共通UI設定
         setup_common_ui(self.demo_name, selected_model)
         
-        # OpenAIクライアントの初期化
+        # Anthropicクライアントの初期化
         try:
-            self.client = OpenAI()
+            self.client = Anthropic()
         except Exception as e:
-            st.error(f"OpenAIクライアントの初期化に失敗しました: {e}")
+            st.error(f"Anthropicクライアントの初期化に失敗しました: {e}")
             return
         
         # デモ実行
@@ -162,7 +162,7 @@ class URLImageToTextDemo(BaseDemo):
         with st.expander("📋 実装例コード", expanded=False):
             st.code("""
 # 画像URLからテキスト生成の実装例
-from openai import OpenAI
+from anthropic import Anthropic
 from openai.types.responses import EasyInputMessageParam, ResponseInputTextParam, ResponseInputImageParam
 
 client = OpenAI()
@@ -259,7 +259,7 @@ class Base64ImageToTextDemo(BaseDemo):
             st.code("""
 # Base64画像からテキスト生成の実装例
 import base64
-from openai import OpenAI
+from anthropic import Anthropic
 from openai.types.responses import EasyInputMessageParam, ResponseInputTextParam, ResponseInputImageParam
 
 # 画像をBase64エンコード
@@ -416,7 +416,7 @@ class PromptToImageDemo(BaseDemo):
         with st.expander("📋 実装例コード", expanded=False):
             st.code("""
 # DALL-E画像生成の実装例
-from openai import OpenAI
+from anthropic import Anthropic
 
 client = OpenAI()
 response = client.images.generate(
@@ -545,7 +545,7 @@ def main():
     with st.sidebar:
         # 1. デモ選択
         demo_name = st.radio(
-            "デモを選択",
+            "[a03_images_and_vision.py] デモを選択",
             demo_manager.get_demo_list(),
             key="demo_selection"
         )

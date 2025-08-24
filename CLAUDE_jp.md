@@ -11,28 +11,28 @@
 ### アプリケーションの実行
 ```bash
 # メイン統合デモ
-streamlit run a10_00_responses_api.py --server.port=8501
+streamlit run a00_responses_api.py --server.port=8501
 
 # 構造化出力デモ
-streamlit run a10_01_structured_outputs_parse_schema.py --server.port=8501
+streamlit run a01_structured_outputs_parse_schema.py --server.port=8501
 
 # Tools・Pydantic Parse デモ
-streamlit run a10_02_responses_tools_pydantic_parse.py --server.port=8502
+streamlit run a02_responses_tools_pydantic_parse.py --server.port=8502
 
 # 画像・ビジョンデモ
-streamlit run a10_03_images_and_vision.py --server.port=8503
+streamlit run a03_images_and_vision.py --server.port=8503
 
 # 音声処理デモ
-streamlit run a10_04_audio_speeches.py --server.port=8504
+streamlit run a04_audio_speeches.py --server.port=8504
 
 # 会話状態管理デモ
-streamlit run a10_05_conversation_state.py --server.port=8505
+streamlit run a05_conversation_state.py --server.port=8505
 
 # Chain of Thought デモ
-streamlit run a10_06_reasoning_chain_of_thought.py --server.port=8506
+streamlit run a06_reasoning_chain_of_thought.py --server.port=8506
 ```
 
-### テスト実行
+### テスト実行　（注）テストは、また、実装されていません。
 ```bash
 # 詳細表示ですべてのテストを実行
 pytest -v

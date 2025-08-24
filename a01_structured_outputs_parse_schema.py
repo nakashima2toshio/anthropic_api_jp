@@ -226,8 +226,8 @@ class BaseDemo(ABC):
         api_params.update(kwargs)
 
         # responses.parse を使用（統一されたAPI呼び出し）
-        openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-        return openai_client.responses.parse(**api_params)
+        anthropic_client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+        return anthropic_client.messages.create(**api_params)
 
     @abstractmethod
     def run(self):
@@ -330,7 +330,7 @@ class EventExtractionDemo(BaseDemo):
         """デモの実行（統一化版）"""
         self.initialize()
         
-        with st.expander("OpenAI API(responses.parse):実装例", expanded=False):
+        with st.expander("Anthropic API(messages.create):実装例", expanded=False):
             st.write(
                 "responses.parse()の構造化出力デモ。PydanticモデルのEventInfoに基づいてイベント情報を抽出。"
                 "テキストから名前・日付・参加者を自動的に構造化データとして取得。"
@@ -452,7 +452,7 @@ class MathReasoningDemo(BaseDemo):
         """デモの実行（統一化版）"""
         self.initialize()
         
-        with st.expander("OpenAI API(responses.parse):実装例", expanded=False):
+        with st.expander("Anthropic API(messages.create):実装例", expanded=False):
             st.write(
                 "responses.parse()の数学的推論デモ。MathReasoningモデルで段階的な解法プロセスを構造化。"
                 "複雑な数式を逐次的なステップに分解し、各段階の説明と計算結果を取得。"
@@ -560,7 +560,7 @@ class UIGenerationDemo(BaseDemo):
         """デモの実行（統一化版）"""
         self.initialize()
         
-        with st.expander("OpenAI API(responses.parse):実装例", expanded=False):
+        with st.expander("Anthropic API(messages.create):実装例", expanded=False):
             st.write(
                 "responses.parse()のUI生成デモ。UIComponentモデルで再帰的なコンポーネント構造を生成。"
                 "自然言語の要求からHTML/React風のコンポーネント階層を自動生成。"
@@ -678,7 +678,7 @@ class EntityExtractionDemo(BaseDemo):
         """デモの実行（統一化版）"""
         self.initialize()
         
-        with st.expander("OpenAI API(responses.parse):実装例", expanded=False):
+        with st.expander("Anthropic API(messages.create):実装例", expanded=False):
             st.write(
                 "responses.parse()のエンティティ抽出デモ。Entitiesモデルで複数カテゴリの要素を抽出。"
                 "自然言語テキストから属性・色・動物などの特定エンティティを分類・抽出。"
@@ -799,7 +799,7 @@ class ConditionalSchemaDemo(BaseDemo):
         """デモの実行（統一化版）"""
         self.initialize()
         
-        with st.expander("OpenAI API(responses.parse):実装例", expanded=False):
+        with st.expander("Anthropic API(messages.create):実装例", expanded=False):
             st.write(
                 "responses.parse()の条件分岐スキーマデモ。ConditionalItemモデルでUnion型による動的スキーマ選択。"
                 "入力内容に応じてUserInfoまたはAddressスキーマを自動選択・適用。"
@@ -911,7 +911,7 @@ class ModerationDemo(BaseDemo):
         """デモの実行（統一化版）"""
         self.initialize()
         
-        with st.expander("OpenAI API(responses.parse):実装例", expanded=False):
+        with st.expander("Anthropic API(messages.create):実装例", expanded=False):
             st.write(
                 "responses.parse()のモデレーションデモ。ModerationResultモデルで安全性チェックと拒否処理。"
                 "不適切コンテンツの検出・拒否理由の明示・安全コンテンツの許可を自動判定。"
@@ -1037,7 +1037,7 @@ class DemoManager:
 
         # デモ選択
         demo_name = st.sidebar.radio(
-            "デモを選択",
+            "[a01_structured_outputs_parse_schema.py] デモを選択",
             list(self.demos.keys()),
             key="demo_selection"
         )
@@ -1073,12 +1073,12 @@ class DemoManager:
 
         # バージョン情報
         st.sidebar.markdown("### バージョン")
-        st.sidebar.markdown("- OpenAI Structured Outputs Parse Schema Demo v2.0 (統一化版)")
+        st.sidebar.markdown("- Anthropic Structured Outputs Parse Schema Demo v2.0 (統一化版)")
         st.sidebar.markdown("- Streamlit " + st.__version__)
 
         # リンク
         st.sidebar.markdown("### リンク")
-        st.sidebar.markdown("[OpenAI API ドキュメント](https://platform.openai.com/docs)")
+        st.sidebar.markdown("[Anthropic API ドキュメント](https://docs.anthropic.com/claude)")
         st.sidebar.markdown("[Streamlit ドキュメント](https://docs.streamlit.io)")
 
         # 統計情報
@@ -1101,9 +1101,9 @@ def main():
         )
 
         # 環境変数のチェック
-        if not os.getenv("OPENAI_API_KEY"):
-            st.error("環境変数 OPENAI_API_KEY が設定されていません。")
-            st.info("export OPENAI_API_KEY='your-api-key' を実行してください。")
+        if not os.getenv("ANTHROPIC_API_KEY"):
+            st.error("環境変数 ANTHROPIC_API_KEY が設定されていません。")
+            st.info("export ANTHROPIC_API_KEY='your-api-key' を実行してください。")
             st.stop()
 
         # セッション状態の初期化（統一化）
