@@ -1060,6 +1060,7 @@ __all__ = [
     'ResponseProcessorUI',
     'DemoBase',
     'SessionStateManager',
+    'InfoPanelManager',
 
     # デコレータ
     'error_handler_ui',
@@ -1068,6 +1069,10 @@ __all__ = [
 
     # ユーティリティ
     'safe_streamlit_json',
+    
+    # 型定義
+    'EasyInputMessageParam',
+    'Response',
 
     # 後方互換性
     'init_page',

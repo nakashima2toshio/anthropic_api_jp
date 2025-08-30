@@ -13,16 +13,26 @@ import logging
 from datetime import datetime
 import time
 from abc import ABC, abstractmethod
-from typing import Optional, List, Dict, Any, Literal
+from typing import Optional, List, Dict, Any, Literal, Tuple
 from pathlib import Path
 
 import streamlit as st
 import pandas as pd
 import requests
 from pydantic import BaseModel, ValidationError
+from PIL import Image
+import io
 
 from anthropic import Anthropic
-from anthropic.types import Message, MessageParam, ContentBlock, TextBlock
+from anthropic.types import Message, MessageParam, ContentBlock, TextBlock, TextBlockParam
+
+# Web Search Tools用の型定義
+class UserLocation(BaseModel):
+    """ユーザーの位置情報"""
+    country: str = "JP"
+    region: str = "Tokyo"
+    city: str = "Shibuya"
+    timezone: str = "Asia/Tokyo"
 
 # プロジェクトディレクトリの設定
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -36,7 +46,7 @@ try:
     from helper_st import (
         UIHelper, MessageManagerUI, ResponseProcessorUI,
         SessionStateManager, error_handler_ui, timer_ui,
-        InfoPanelManager, safe_streamlit_json
+        InfoPanelManager, safe_streamlit_json, EasyInputMessageParam
     )
     from helper_api import (
         config, logger, TokenManager, AnthropicClient,
@@ -47,6 +57,8 @@ try:
 except ImportError as e:
     st.error(f"ヘルパーモジュールのインポートに失敗しました: {e}")
     st.info("必要なファイルが存在することを確認してください: helper_st.py, helper_api.py")
+    # フォールバック: ローカルでEasyInputMessageParamを定義
+    EasyInputMessageParam = MessageParam
     st.stop()
 
 
@@ -233,9 +245,37 @@ class TextResponseDemo(BaseDemo):
     def run(self):
         """デモの実行（統一化版）"""
         self.initialize()
+        text_compatibility = """
+        ### 要点比較：
+
+| 目的 | OpenAI 側 | Anthropic ネイティブ | Anthropic の OpenAI SDK 互換（ベータ） |
+|---|---|---|---|
+| 呼び出し | `client.responses.create(...)` | `client.messages.create(...)` | `client.chat.completions.create(...)` |
+| エンドポイント | `/v1/responses` | `/v1/messages` | （SDKは Chat Completions 形だが実体は Claude の `/v1/messages` にマップ） |
+| 入力形 | `input`（＋`instructions`） | `messages` 配列（＋`system`） | `messages` 配列（OpenAI 形式） |
+| ツール | `tools=[...]`（ホスト型ツール等が統合） | `tools` を JSON Schema で定義。`tool_use` → クライアント側実行（サーバー Web search tool もあり） | function-calling 系は概ね通るが `response_format` など一部は無視される |
+| ストリーミング | 可（`stream=True`） | 可（`stream`） | 可 |
+| 備考 | Responses は状態管理や内蔵ツールを統合 | Claude はコンテンツブロック（`text`/`tool_use` など）で返す | **テスト用途向け**。本番はネイティブ `Messages API` 推奨 |
+
+        - 補足: 互換レイヤーは *Chat Completions 互換であり、Responses API のフル互換ではありません。
+        （`response_format` など一部フィールドはスキップ／無視されることがあります）。
+        """
+        with st.expander("OpenAI APIとAnthropic APIの互換性："):
+            st.write("""
+            資料： https://docs.anthropic.com/en/api/openai-sdk  \n
+            「Anthropicは、OpenAI SDKを使用してAnthropic APIをテストするための互換性レイヤーを提供します。 \n
+            コードを少し変更するだけで、Anthropicモデルの機能を迅速に評価できます。」  \n
+            だそうです。なので、  \n
+            OpenAI APIから、Anthropic APIへ移植が可能です。  \n
+            ・RAG: Anthropicには、EmbeddingのAPI、CloudのVector Storeがないので、 \n
+            　実現方法（Cloud版、Local版: Qdrantの利用で。）は、本リポジトリーの  \n
+            　https://github.com/nakashima2toshio/openai_rag_jp  \n
+            　を参照、参考にしてください。
+            """)
+            st.markdown(text_compatibility)
         with st.expander("Anthropic API実装例", expanded=False):
             st.write(
-                "Anthropic Messages APIの基本的なテキスト応答デモ。デフォルトメッセージ+ユーザー入力でOne-Shot応答を実行。MessageParamでメッセージ構築し、ResponseProcessorUIで結果表示。")
+                "Anthropic Messages APIの基本的なテキスト応答デモ。デフォルトメッセージ+ユーザー入力でOne-Shot応答を実行。 MessageParamでメッセージ構築し、ResponseProcessorUIで結果表示。")
             st.code("""
             messages = get_default_messages()
             messages.append(
@@ -252,6 +292,20 @@ class TextResponseDemo(BaseDemo):
             }
             self.client.messages.create(**params)
         ResponseProcessorUI.display_response(response)
+        
+        # -------
+        self.call_api_unified
+            # API呼び出しパラメータの準備
+            ┗ 
+            api_params = {
+                "messages": messages,
+                "model": model,
+                "system": system_prompt,
+                "max_tokens": 4096
+            }
+
+            # create_message を使用（Anthropic API）
+            return self.client.create_message(**api_params)
             """)
 
         example_query = config.get("samples.prompts.responses_query",
@@ -331,7 +385,7 @@ class MemoryResponseDemo(BaseDemo):
         """デモの実行（改修版）"""
         self.initialize()
         st.write(
-            "**連続会話デモ（改修版）**\n"
+            "**連続会話デモ**\n"
             "responses.create()で連続した会話を実現。各ステップで「プロンプト + 回答」の履歴を保持し、"
             "新しい質問を追加して連続実行します。会話の流れと各ステップが視覚的に確認できます。"
         )
@@ -819,6 +873,7 @@ class ImageResponseDemo(BaseDemo):
             st.write(
                 "マルチモーダル対応のAnthropic Messages APIデモ。URL・Base64形式の画像入力に対応。Claudeの視覚機能を活用した画像解析例。")
             st.code("""
+            # URL画像の場合
             messages = get_default_messages()
             messages.append({
                 "role": "user",
@@ -833,6 +888,23 @@ class ImageResponseDemo(BaseDemo):
                     }
                 ]
             })
+            
+            # Base64画像の場合
+            messages.append({
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": question},
+                    {
+                        "type": "image",
+                        "source": {
+                            "type": "base64",
+                            "media_type": "image/jpeg",  # または image/png, image/webp など
+                            "data": base64_encoded_data
+                        }
+                    }
+                ]
+            })
+            
             response = self.call_api_unified(messages, temperature=temperature)
             ResponseProcessorUI.display_response(response)
             """)
@@ -873,27 +945,107 @@ class ImageResponseDemo(BaseDemo):
             self._process_image_question(question, image_url, temperature)
 
     def _run_base64_demo(self):
-        """Base64画像のデモ（統一化版）"""
+        """Base64画像のデモ（Anthropic API対応版）"""
+        st.write("**📁 ローカル画像ファイルからBase64エンコード**")
+        st.info("💡 Anthropic APIはbase64エンコード後最大5MBまでの画像を処理できます")
+        
         images_dir = config.get("paths.images_dir", "images")
+        
+        # imagesディレクトリが存在しない場合はdataディレクトリを試す
+        if not Path(images_dir).exists():
+            images_dir = "data"
+            if not Path(images_dir).exists():
+                # 最後の手段として現在のディレクトリを試す
+                images_dir = "."
+            
         files = self._get_image_files(images_dir)
 
         if not files:
-            st.warning(f"{images_dir} に画像ファイルがありません")
-            return
-
-        file_path = st.selectbox("画像ファイルを選択", files, key=f"img_select_{self.safe_key}")
-
-        with st.form(key=f"img_b64_form_{self.safe_key}"):
-            # 統一されたtemperatureコントロール
-            temperature = self.create_temperature_control(
-                default_temp=0.3,
-                help_text="低い値ほど一貫性のある回答"
+            st.warning(f"📂 {images_dir} ディレクトリに画像ファイルが見つかりません")
+            st.info("💡 サポート形式: PNG, JPG, JPEG, WebP, GIF")
+            
+            # ファイルアップロード機能を追加
+            st.write("**または画像ファイルをアップロード:**")
+            uploaded_file = st.file_uploader(
+                "画像ファイルを選択", 
+                type=['png', 'jpg', 'jpeg', 'webp', 'gif'],
+                key=f"img_upload_{self.safe_key}"
             )
+            
+            if uploaded_file is not None:
+                # 一時ファイルとして保存
+                temp_path = f"/tmp/{uploaded_file.name}"
+                with open(temp_path, "wb") as f:
+                    f.write(uploaded_file.getbuffer())
+                files = [temp_path]
+            else:
+                return
 
-            submitted = st.form_submit_button("選択画像で実行")
+        if files:
+            # ファイル選択UI
+            if len(files) == 1:
+                file_path = files[0]
+                st.write(f"**選択されたファイル:** {Path(file_path).name}")
+            else:
+                file_options = [f"{Path(f).name} ({self._get_file_size_info(f)})" for f in files]
+                selected_idx = st.selectbox(
+                    "📷 画像ファイルを選択", 
+                    range(len(file_options)),
+                    format_func=lambda x: file_options[x],
+                    key=f"img_select_{self.safe_key}"
+                )
+                file_path = files[selected_idx]
+            
+            # ファイル情報表示
+            if file_path and Path(file_path).exists():
+                self._display_file_info(file_path)
+                
+                # プレビュー表示
+                try:
+                    st.image(file_path, caption=f"プレビュー: {Path(file_path).name}", width=300)
+                except Exception as e:
+                    st.warning(f"プレビュー表示エラー: {e}")
 
-        if submitted and file_path:
-            self._process_base64_image(file_path, temperature)
+                # 質問入力と実行
+                with st.form(key=f"img_b64_form_{self.safe_key}"):
+                    question = st.text_input(
+                        "🤔 画像について質問してください:",
+                        value="この画像を詳しく説明してください。",
+                        help="画像の内容について知りたいことを入力してください"
+                    )
+                    
+                    # 統一されたtemperatureコントロール
+                    temperature = self.create_temperature_control(
+                        default_temp=0.3,
+                        help_text="低い値ほど一貫性のある回答"
+                    )
+
+                    submitted = st.form_submit_button("🚀 画像解析を実行", type="primary")
+
+                if submitted and file_path and question.strip():
+                    self._process_base64_image(file_path, question, temperature)
+                elif submitted and not question.strip():
+                    st.warning("⚠️ 質問を入力してください")
+
+    def _display_file_info(self, file_path: str):
+        """ファイル情報の表示"""
+        try:
+            file_stats = Path(file_path).stat()
+            size_mb = file_stats.st_size / (1024 * 1024)
+            
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("📁 ファイル名", Path(file_path).name)
+            with col2:
+                st.metric("📊 ファイルサイズ", f"{size_mb:.2f}MB")
+            with col3:
+                estimated_base64_mb = size_mb * 1.37
+                max_size_mb = config.get("limits.max_image_size_mb", 5)
+                status = "✅" if estimated_base64_mb <= max_size_mb else "⚠️"
+                st.metric("📈 推定base64サイズ", f"{status} {estimated_base64_mb:.2f}MB")
+                
+        except Exception as e:
+            st.warning(f"ファイル情報取得エラー: {e}")
 
     def _get_image_files(self, images_dir: str) -> List[str]:
         """画像ファイルのリストを取得"""
@@ -902,15 +1054,190 @@ class ImageResponseDemo(BaseDemo):
         for pattern in patterns:
             files.extend(glob.glob(f"{images_dir}/{pattern}"))
         return sorted(files)
-
-    def _encode_image(self, path: str) -> str:
-        """画像をBase64エンコード"""
+        
+    def _get_file_size_info(self, file_path: str) -> str:
+        """ファイルサイズ情報を取得（Anthropic API制限対応）"""
         try:
-            with open(path, "rb") as f:
-                return base64.b64encode(f.read()).decode()
+            size_bytes = os.path.getsize(file_path)
+            size_mb = size_bytes / (1024 * 1024)
+            
+            # base64エンコード後の推定サイズ（約137%増加）
+            estimated_base64_mb = size_mb * 1.37
+            max_size_mb = config.get("limits.max_image_size_mb", 5)  # Anthropic APIの制限
+            
+            if estimated_base64_mb <= max_size_mb:
+                status = "✅"
+            elif estimated_base64_mb <= max_size_mb * 1.5:  # リサイズで対応可能
+                status = "🔄"
+            else:
+                status = "⚠️"  # 大幅なリサイズが必要
+                
+            return f"{status} {size_mb:.2f}MB → ~{estimated_base64_mb:.1f}MB"
+        except Exception:
+            return "❓ サイズ不明"
+
+    def _encode_image(self, path: str) -> Tuple[str, str]:
+        """画像をBase64エンコード（Anthropic API対応）
+        
+        Returns:
+            Tuple[str, str]: (base64_encoded_data, media_type)
+        """
+        try:
+            # ファイル拡張子からメディアタイプを判定
+            ext = Path(path).suffix.lower()
+            media_type_map = {
+                '.jpg': 'image/jpeg',
+                '.jpeg': 'image/jpeg', 
+                '.png': 'image/png',
+                '.webp': 'image/webp',
+                '.gif': 'image/gif'
+            }
+            original_media_type = media_type_map.get(ext, 'image/jpeg')
+            
+            # Anthropic APIの制限: 5MB (base64エンコード後)
+            max_base64_size_mb = config.get("limits.max_image_size_mb", 5)
+            max_base64_bytes = max_base64_size_mb * 1024 * 1024
+            
+            # ファイルサイズをチェック
+            file_size = os.path.getsize(path)
+            file_size_mb = file_size / (1024 * 1024)
+            
+            # base64エンコード後の推定サイズ（約133%増加）
+            estimated_base64_size = file_size * 1.37
+            
+            st.info(f"📂 ファイル: {Path(path).name}")
+            st.info(f"📊 元サイズ: {file_size_mb:.2f}MB, 推定base64サイズ: {estimated_base64_size/(1024*1024):.2f}MB")
+            
+            # サイズが制限を超える場合はリサイズ
+            if estimated_base64_size > max_base64_bytes:
+                st.warning(f"⚠️ 推定base64サイズが制限({max_base64_size_mb}MB)を超過するため、リサイズします")
+                return self._resize_and_encode_image(path, max_base64_bytes)
+            
+            # サイズが問題なければそのままエンコード
+            with open(path, 'rb') as image_file:
+                image_bytes = image_file.read()
+                encoded_data = base64.b64encode(image_bytes).decode('utf-8')
+                
+            # 実際のbase64サイズをチェック
+            actual_base64_size = len(encoded_data.encode('utf-8'))
+            actual_size_mb = actual_base64_size / (1024 * 1024)
+            
+            if actual_base64_size > max_base64_bytes:
+                st.warning(f"⚠️ 実際のbase64サイズ({actual_size_mb:.2f}MB)が制限を超過するため、リサイズします")
+                return self._resize_and_encode_image(path, max_base64_bytes)
+            
+            st.success(f"✅ エンコード完了: {actual_size_mb:.2f}MB (base64)")
+            return encoded_data, original_media_type
+            
         except Exception as e:
             st.error(f"画像エンコードエラー: {e}")
-            return ""
+            return "", "image/jpeg"
+            
+    def _resize_and_encode_image(self, path: str, max_base64_bytes: int) -> Tuple[str, str]:
+        """画像をリサイズしてBase64エンコード（Anthropic API制限対応）
+        
+        Returns:
+            Tuple[str, str]: (base64_encoded_data, media_type)
+        """
+        try:
+            st.info("🔄 リサイズ処理を開始...")
+            
+            # 元の拡張子からメディアタイプを判定
+            ext = Path(path).suffix.lower()
+            preserve_format = ext in ['.png', '.webp']  # 透明度を保持したい形式
+            
+            with Image.open(path) as img:
+                original_size = img.size
+                original_mode = img.mode
+                
+                st.info(f"📐 元画像: {original_size[0]}x{original_size[1]}, モード: {original_mode}")
+                
+                # フォーマット決定
+                if preserve_format and ext == '.png':
+                    save_format = 'PNG'
+                    media_type = 'image/png'
+                elif preserve_format and ext == '.webp':
+                    save_format = 'WebP'
+                    media_type = 'image/webp'
+                else:
+                    save_format = 'JPEG'
+                    media_type = 'image/jpeg'
+                    # JPEGの場合はRGBに変換
+                    if img.mode in ('RGBA', 'LA', 'P'):
+                        # 透明度がある場合は白背景で合成
+                        if img.mode == 'P':
+                            img = img.convert('RGBA')
+                        if 'transparency' in img.info or img.mode in ('RGBA', 'LA'):
+                            background = Image.new('RGB', img.size, (255, 255, 255))
+                            if img.mode == 'RGBA':
+                                background.paste(img, mask=img.split()[-1])
+                            else:
+                                background.paste(img)
+                            img = background
+                        else:
+                            img = img.convert('RGB')
+                
+                # 段階的リサイズ処理
+                quality = 90 if save_format == 'JPEG' else None
+                scale_factor = 0.9
+                attempt = 0
+                max_attempts = 15
+                
+                while attempt < max_attempts:
+                    # 画像を保存してbase64エンコード
+                    buffer = io.BytesIO()
+                    
+                    if save_format == 'JPEG':
+                        img.save(buffer, format=save_format, quality=quality, optimize=True)
+                    elif save_format == 'PNG':
+                        img.save(buffer, format=save_format, optimize=True)
+                    else:  # WebP
+                        img.save(buffer, format=save_format, quality=quality or 90, optimize=True)
+                    
+                    # base64エンコード
+                    buffer.seek(0)
+                    image_bytes = buffer.read()
+                    encoded_data = base64.b64encode(image_bytes).decode('utf-8')
+                    encoded_size = len(encoded_data.encode('utf-8'))
+                    
+                    size_mb = encoded_size / (1024 * 1024)
+                    
+                    if encoded_size <= max_base64_bytes:
+                        st.success(f"✅ リサイズ完了: {img.size[0]}x{img.size[1]} → {size_mb:.2f}MB (base64)")
+                        return encoded_data, media_type
+                    
+                    # サイズがまだ大きい場合の調整
+                    attempt += 1
+                    
+                    if attempt <= 5:
+                        # 最初は品質を下げる（JPEGとWebPのみ）
+                        if save_format in ['JPEG', 'WebP'] and quality:
+                            quality = max(60, quality - 10)
+                    else:
+                        # サイズを縮小
+                        new_width = int(img.width * scale_factor)
+                        new_height = int(img.height * scale_factor)
+                        
+                        # 最小サイズチェック
+                        if new_width < 100 or new_height < 100:
+                            st.error("❌ 最小サイズ(100x100)を下回るため、リサイズを中止")
+                            return "", media_type
+                        
+                        img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+                        
+                        # 品質もさらに下げる
+                        if save_format in ['JPEG', 'WebP'] and quality:
+                            quality = max(40, quality - 5)
+                    
+                    if attempt % 3 == 0:
+                        st.info(f"🔄 リサイズ中 ({attempt}/{max_attempts}): {img.size[0]}x{img.size[1]}, {size_mb:.2f}MB")
+                
+                st.error(f"❌ 最大試行回数({max_attempts})を超過。最終サイズ: {size_mb:.2f}MB")
+                return "", media_type
+                            
+        except Exception as e:
+            st.error(f"❌ 画像リサイズエラー: {e}")
+            return "", "image/jpeg"
 
     def _process_image_question(self, question: str, image_url: str, temperature: Optional[float]):
         """画像質問の処理（統一化版）"""
@@ -935,46 +1262,49 @@ class ImageResponseDemo(BaseDemo):
         st.subheader("回答:")
         ResponseProcessorUI.display_response(response)
 
-    def _process_base64_image(self, file_path: str, temperature: Optional[float]):
-        """Base64画像の処理（統一化版）"""
-        b64 = self._encode_image(file_path)
-        if not b64:
+    def _process_base64_image(self, file_path: str, question: str, temperature: Optional[float]):
+        """Base64画像の処理（Anthropic API対応版）"""
+        # 画像エンコード
+        with st.spinner("🔄 画像をエンコード中..."):
+            b64_data, media_type = self._encode_image(file_path)
+            
+        if not b64_data:
+            st.error("❌ 画像のエンコードに失敗しました")
             return
 
-        st.image(file_path, caption="選択画像", width=320)
-
-        # ファイル拡張子からmedia_typeを推定
-        ext = file_path.split('.')[-1].lower()
-        media_type_map = {
-            'png': 'image/png',
-            'jpg': 'image/jpeg', 
-            'jpeg': 'image/jpeg',
-            'webp': 'image/webp',
-            'gif': 'image/gif'
-        }
-        media_type = media_type_map.get(ext, 'image/jpeg')
-
+        # エンコード結果の表示
+        st.success(f"✅ エンコード完了: {media_type}")
+        
+        # メッセージ構築（Anthropic API形式）
         messages = get_default_messages()
         messages.append({
             "role": "user",
             "content": [
-                {"type": "text", "text": "このイメージを日本語で説明しなさい。"},
+                {"type": "text", "text": question},
                 {
                     "type": "image",
                     "source": {
                         "type": "base64",
                         "media_type": media_type,
-                        "data": b64
+                        "data": b64_data
                     }
                 }
             ]
         })
 
-        with st.spinner("処理中..."):
-            response = self.call_api_unified(messages, temperature=temperature)
-
-        st.subheader("出力テキスト:")
-        ResponseProcessorUI.display_response(response)
+        # API呼び出し
+        with st.spinner("🤖 Claude が画像を解析中..."):
+            try:
+                response = self.call_api_unified(messages, temperature=temperature)
+                
+                st.success("✅ 画像解析が完了しました")
+                st.subheader("🎯 解析結果:")
+                ResponseProcessorUI.display_response(response)
+                
+            except Exception as e:
+                st.error(f"❌ API呼び出しエラー: {str(e)}")
+                if "image too large" in str(e).lower():
+                    st.info("💡 画像サイズが大きすぎる可能性があります。より小さな画像をお試しください。")
 
 
 # ==================================================
@@ -1125,45 +1455,75 @@ class StructuredOutputDemo(BaseDemo):
 
             messages = [
                 EasyInputMessageParam(
-                    role="developer",
+                    role="user",
                     content="Extract event details from the text. Extract name, date, and participants."
                 ),
                 EasyInputMessageParam(
                     role="user",
-                    content=[ResponseInputTextParam(type="input_text", text=text)]
+                    content=[{"type": "text", "text": text}]
                 ),
             ]
 
-            text_cfg = ResponseTextConfigParam(
-                format=ResponseFormatTextJSONSchemaConfigParam(
-                    name="event_extraction",
-                    type="json_schema",
-                    schema=schema,
-                    strict=True,
-                )
-            )
+            # Anthropic APIでは構造化出力の設定方法が異なる
+            # システムメッセージで構造化出力を指定
+            system_msg = f"""以下のJSONスキーマに従って応答してください：
+
+{json.dumps(schema, indent=2, ensure_ascii=False)}
+
+必ずこの形式でJSONを返してください。"""
 
             with st.spinner("🤖 AI がイベント情報を抽出しています..."):
-                # 統一されたAPI呼び出し（左ペインで選択されたモデルを使用）
+                # Anthropic APIの標準的な呼び出し方法
                 api_params = {
                     "model": model,
-                    "input": messages,
-                    "text" : text_cfg
+                    "system": system_msg,
+                    "messages": messages,
+                    "max_tokens": 4096
                 }
 
                 # temperatureサポートチェック
                 if not self.is_reasoning_model(model) and temperature is not None:
                     api_params["temperature"] = temperature
 
-                response = self.client.create_response(**api_params)
+                response = self.call_api_unified(
+                    messages=messages,
+                    model=model,
+                    temperature=temperature,
+                    system=system_msg
+                )
 
             # 結果の表示
             st.success("✅ イベント情報の抽出が完了しました")
 
-            # JSON出力をPydanticモデルで検証
-            event = self.Event.model_validate_json(response.output_text)
+            # レスポンスからJSON部分を抽出してPydanticモデルで検証
+            try:
+                response_text = response.content[0].text if hasattr(response, 'content') else str(response)
+                # JSON部分を抽出（```json ブロックがある場合の処理）
+                if '```json' in response_text:
+                    json_start = response_text.find('```json') + 7
+                    json_end = response_text.find('```', json_start)
+                    json_text = response_text[json_start:json_end].strip()
+                else:
+                    # JSON形式のテキストをそのまま使用
+                    json_text = response_text.strip()
+                
+                event = self.Event.model_validate_json(json_text)
+            except (json.JSONDecodeError, ValueError) as json_err:
+                # JSONパースに失敗した場合、文字列から辞書形式で抽出を試行
+                st.warning("JSON形式での解析に失敗したため、文字列から抽出を試行します...")
+                try:
+                    # 簡易的な辞書型抽出（この部分は改善の余地あり）
+                    event = self.Event(
+                        event_name="解析エラー",
+                        date="未設定",
+                        location="未設定", 
+                        description=response_text[:200] + "..." if len(response_text) > 200 else response_text
+                    )
+                except Exception as e:
+                    st.error(f"構造化データの解析に完全に失敗しました: {e}")
+                    return
 
-            st.subheader("📋 抽出結果 (responses.create)")
+            st.subheader("📋 抽出結果 (messages.create)")
             self._display_extracted_event(event, response)
 
         except (ValidationError, json.JSONDecodeError) as e:
@@ -1179,39 +1539,56 @@ class StructuredOutputDemo(BaseDemo):
             st.info("🔄 responses.parse() でイベント情報を抽出中...")
 
             # Responses API用のメッセージ形式に変更
+            # Anthropic APIで構造化出力を行うためのシステムメッセージ
+            schema = self.Event.model_json_schema()
+            system_msg = f"""以下のJSONスキーマに従ってイベント情報を抽出してください：
+
+{json.dumps(schema, indent=2, ensure_ascii=False)}
+
+必ずこの形式でJSONのみを返してください。他のテキストは含めないでください。"""
+
             messages = [
-                EasyInputMessageParam(
-                    role="developer",
-                    content="Extract event details from the text. Extract name, date, and participants."
-                ),
-                EasyInputMessageParam(
-                    role="user",
-                    content=[ResponseInputTextParam(type="input_text", text=text)]
-                ),
+                {
+                    "role": "user",
+                    "content": f"次のテキストからイベント情報を抽出してください: {text}"
+                }
             ]
 
-            with st.spinner("🤖 AI がイベント情報を抽出しています..."):
-                # 統一されたAPI呼び出し（responses.parseを使用）
-                api_params = {
-                    "model": model,
-                    "input": messages,
-                    "text_format": self.Event
-                }
+            with st.spinner("🔄 responses.parse() でイベント情報を抽出中..."):
+                try:
+                    response = self.call_api_unified(
+                        messages=messages,
+                        model=model,
+                        temperature=temperature,
+                        system=system_msg
+                    )
 
-                # temperatureサポートチェック
-                if not self.is_reasoning_model(model) and temperature is not None:
-                    api_params["temperature"] = temperature
-
-                response = self.client.parse_response(**api_params)
-
-            # 結果の表示
-            st.success("✅ イベント情報の抽出が完了しました")
-
-            # responses.parseの結果はoutput_parsedに格納される
-            event = response.output_parsed
-
-            st.subheader("📋 抽出結果 (responses.parse)")
-            self._display_extracted_event(event, response)
+                    # レスポンスからJSON部分を抽出
+                    response_text = response.content[0].text if hasattr(response, 'content') else str(response)
+                    
+                    # JSON部分のみを抽出
+                    json_text = response_text.strip()
+                    if json_text.startswith('```json'):
+                        json_start = json_text.find('\n') + 1
+                        json_end = json_text.rfind('```')
+                        json_text = json_text[json_start:json_end].strip()
+                    
+                    # Pydanticモデルで検証
+                    event = self.Event.model_validate_json(json_text)
+                    
+                    # 結果の表示
+                    st.success("✅ イベント情報の抽出が完了しました")
+                    st.subheader("📋 抽出結果 (Pydanticパース)")
+                    self._display_extracted_event(event, response)
+                    
+                except json.JSONDecodeError as json_err:
+                    st.error(f"❌ JSON解析エラー: {json_err}")
+                    st.info("レスポンス内容:")
+                    st.text(response_text[:500] + "..." if len(response_text) > 500 else response_text)
+                except ValidationError as val_err:
+                    st.error(f"❌ バリデーションエラー: {val_err}")
+                except Exception as api_err:
+                    st.error(f"❌ API呼び出しエラー: {api_err}")
 
         except Exception as e:
             st.error(f"❌ responses.parse実行エラー: {str(e)}")
@@ -1631,661 +2008,474 @@ class FileSearchVectorStoreDemo(BaseDemo):
         """デモの実行（正しいAPI対応版）"""
         self.initialize()
         st.header("FileSearchデモ")
-        st.write(
-            "（注）Vector Storeのデータは、英語なので、質問は英語の必要があります。"
-            "セレクタで選択可能。responses.create()でドキュメント検索を実行し、"
-            "Vector Store検索APIでの直接検索も可能。"
-        )
         with st.expander("利用：OpenWeatherMap API(比較用)", expanded=False):
             st.code("""
-            # FileSearchツールパラメータの作成
-            fs_tool = FileSearchToolParam(
-                type="file_search",
-                vector_store_ids=[vector_store_id],
-                max_num_results=max_results
-            )
-            # API呼び出し
-            response = self.call_api_unified(
-                messages=[EasyInputMessageParam(role="user", content=query)],
-                tools=[fs_tool],
-                include=["file_search_call.results"]
-            )
+            Anthropic APIにEmbedding, RAGの機能は、実装されていません。
+            以下のレポジトリーに、cloud版、Local版のRAGシステムの例（デモ）があります。
+            https://github.com/nakashima2toshio/openai_rag_jp
             
-            # self.call_api_unified
-            # API呼び出しパラメータの準備
-            api_params = {
-                "input": messages,
-                "model": model
-            }
-            # responses.create を使用（統一されたAPI呼び出し）
-            
-            return self.client.create_response(**api_params)
             """)
 
-        # Vector Storeの取得と選択
-        vector_store_info = self._get_vector_store_selection()
-
-        if not vector_store_info:
-            st.warning("⚠️ 利用可能なVector Storeが見つかりません。")
-            st.info("💡 OpenAI PlaygroundでVector Storeを作成してください。")
-            return
-
-        vector_store_id = vector_store_info["id"]
-        vector_store_name = vector_store_info["name"]
-
-        # 選択されたVector Store情報を表示
-        with st.expander("📂 選択されたVector Store情報", expanded=False):
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.write("**名前**:", vector_store_name)
-                st.write("**ID**:", f"`{vector_store_id}`")
-
-            with col2:
-                if "file_counts" in vector_store_info:
-                    file_counts = vector_store_info["file_counts"]
-                    total_files = file_counts.get("total", 0)
-                    completed_files = file_counts.get("completed", 0)
-                    in_progress = file_counts.get("in_progress", 0)
-                    failed = file_counts.get("failed", 0)
-
-                    st.write("**ファイル数**:", f"{completed_files}/{total_files}")
-                    if in_progress > 0:
-                        st.info(f"⏳ 処理中: {in_progress}件")
-                    if failed > 0:
-                        st.warning(f"⚠️ 失敗: {failed}件")
-
-            with col3:
-                if "created_at" in vector_store_info:
-                    created_date = datetime.fromtimestamp(vector_store_info["created_at"]).strftime("%Y-%m-%d %H:%M")
-                    st.write("**作成日時**:", created_date)
-                if "bytes" in vector_store_info:
-                    bytes_size = vector_store_info["bytes"]
-                    if bytes_size > 0:
-                        mb_size = bytes_size / (1024 * 1024)
-                        st.write("**容量**:", f"{mb_size:.2f} MB")
-
-        #
-        with st.expander("📂 英文-質問例", expanded=False):
-            st.code("""
-customer_support_faq.csv ：カスタマーサポート・FAQデータセット
-    "How do I create a new account?",
-    "What payment methods are available?",
-    "Can I return a product?",
-    "I forgot my password",
-    "How can I contact the support team?"
-
-sciq_qa.csv  ：科学・技術QAデータセット
-    "What are the latest trends in artificial intelligence?",
-    "What is the principle of quantum computing?",
-    "What are the types and characteristics of renewable energy?",
-    "What are the current status and challenges of gene editing technology?",
-    "What are the latest technologies in space exploration?"
-
-medical_qa.csv   ： 医療質問回答データセット
-    "How to prevent high blood pressure?",
-    "What are the symptoms and treatment of diabetes?",
-    "What are the risk factors for heart disease?",
-    "What are the guidelines for healthy eating?",
-    "What is the relationship between exercise and health?"
-
-legal_qa.csv  ：法律・判例QAデータセット
-    "What are the important clauses in contracts?",
-    "How to protect intellectual property rights?",
-    "What are the basic principles of labor law?",
-    "What is an overview of personal data protection law?",
-    "What is the scope of application of consumer protection law?"
-            """)
-
-        st.write(
-            "AI検索で回答が得られない固有の情報にも[Vector Store]から検索できます。"
-            "Vector Storeのスコアが0.8以上はかなり良い、0.6以上が良いです。"
-        )
-        # 検索タブ
-        tab1, tab2 = st.tabs(["🤖 AI検索 (Responses API)", "🔍 直接検索 (Vector Store API)"])
-
-
-        with tab1:
-            self._run_responses_search(vector_store_id)
-
-        with tab2:
-            self._run_direct_search(vector_store_id)
-
-        # Vector Store一覧更新
-        col1, col2 = st.columns([3, 1])
-        with col2:
-            if st.button("🔄 Vector Store一覧更新", key=f"refresh_{self.safe_key}"):
-                self._clear_vector_stores_cache()
-                st.rerun()
-
-    def _run_responses_search(self, vector_store_id: str):
-        """Responses APIを使用したFileSearch"""
-        st.subheader("🤖 AI検索 (Responses API)")
-        st.write("Responses APIのfile_searchツールを使用したAI回答付き検索")
-
-        # 検索クエリ入力
-        query = st.text_input(
-            "🔍 検索クエリ",
-            value="When is the payment deadline for the invoice? return policy?",
-            help="Vector Store内のドキュメントから検索したい内容を入力してください",
-            key=f"ai_search_query_{self.safe_key}"
-        )
-
-        # 検索オプション
-        with st.expander("🔧 検索オプション", expanded=False):
-            max_results = st.slider(
-                "最大検索結果数",
-                min_value=1,
-                max_value=20,
-                value=5,
-                help="検索で取得する最大結果数"
-            )
-
-        # FileSearch実行
-        if st.button("🚀 AI検索実行", key=f"ai_search_exec_{self.safe_key}", use_container_width=True):
-            if query.strip():
-                self._execute_ai_search(vector_store_id, query, max_results)
-            else:
-                st.error("❌ 検索クエリを入力してください。")
-
-    def _run_direct_search(self, vector_store_id: str):
-        """Vector Store APIを使用した直接検索"""
-        st.subheader("🔍 直接検索 (Vector Store API)")
-        st.write("Vector Store APIの検索機能を直接使用した検索")
-
-        # 検索クエリ入力
-        query = st.text_input(
-            "🔍 検索クエリ",
-            value="When is the payment deadline for the invoice? return policy?",
-            help="Vector Store内のドキュメントから検索したい内容を入力してください",
-            key=f"direct_search_query_{self.safe_key}"
-        )
-
-        # 検索オプション
-        with st.expander("🔧 詳細検索オプション", expanded=False):
-            col1, col2 = st.columns(2)
-            with col1:
-                max_results = st.slider(
-                    "最大検索結果数",
-                    min_value=1,
-                    max_value=50,
-                    value=10,
-                    help="検索で取得する最大結果数（1-50）"
-                )
-                rewrite_query = st.checkbox(
-                    "クエリ書き換え",
-                    value=False,
-                    help="自然言語クエリをベクトル検索用に書き換える"
-                )
-            with col2:
-                # フィルタオプション（将来の拡張用）
-                st.write("**フィルタオプション**")
-                st.info("今後のアップデートで追加予定")
-
-        # 直接検索実行
-        if st.button("🔍 直接検索実行", key=f"direct_search_exec_{self.safe_key}", use_container_width=True):
-            if query.strip():
-                self._execute_direct_search(vector_store_id, query, max_results, rewrite_query)
-            else:
-                st.error("❌ 検索クエリを入力してください。")
-
-    def _get_vector_stores(self) -> List[Dict[str, Any]]:
-        """正しいOpenAI APIからVector Storeのリストを取得"""
-        # キャッシュチェック
-        if (self._vector_stores_cache is not None and
-                self._cache_timestamp is not None and
-                time.time() - self._cache_timestamp < self._cache_ttl):
-            return self._vector_stores_cache
-
-        try:
-            with st.spinner("🔄 Vector Store一覧を取得中..."):
-                # より明確なアクセス方法
-                openai_client = self.client.client
-                response = openai_client.vector_stores.list(
-                    limit=20,
-                    order="desc"  # 新しい順に取得
-                )
-
-                vector_stores = []
-                # 最新の4つのみを処理
-                for vs in response.data[:4]:
-                    # file_countsはオブジェクトなので属性として直接アクセス
-                    file_counts_obj = getattr(vs, 'file_counts', None)
-                    if file_counts_obj:
-                        file_counts_dict = {
-                            "total"      : getattr(file_counts_obj, 'total', 0),
-                            "completed"  : getattr(file_counts_obj, 'completed', 0),
-                            "failed"     : getattr(file_counts_obj, 'failed', 0),
-                            "in_progress": getattr(file_counts_obj, 'in_progress', 0),
-                            "cancelled"  : getattr(file_counts_obj, 'cancelled', 0)
-                        }
-                    else:
-                        file_counts_dict = {
-                            "total"      : 0,
-                            "completed"  : 0,
-                            "failed"     : 0,
-                            "in_progress": 0,
-                            "cancelled"  : 0
-                        }
-
-                    vector_store_info = {
-                        "id"         : vs.id,
-                        "name"       : vs.name or f"Vector Store {vs.id[:8]}",
-                        "created_at" : vs.created_at,
-                        "bytes"      : getattr(vs, 'bytes', 0),
-                        "file_counts": file_counts_dict,
-                        "object"     : getattr(vs, 'object', 'vector_store'),
-                    }
-                    vector_stores.append(vector_store_info)
-
-                # キャッシュ更新
-                self._vector_stores_cache = vector_stores
-                self._cache_timestamp = time.time()
-
-                logger.info(f"取得したVector Store数: {len(vector_stores)}")
-                return vector_stores
-
-        except Exception as e:
-            logger.error(f"Vector Store取得エラー: {e}")
-            error_message = str(e)
-
-            # 具体的なエラーメッセージの表示
-            if "authentication" in error_message.lower():
-                st.error("🔐 認証エラー: OpenAI APIキーを確認してください。")
-            elif "rate limit" in error_message.lower():
-                st.error("⏱️ レート制限エラー: しばらく待ってから再試行してください。")
-            elif "permission" in error_message.lower() or "forbidden" in error_message.lower():
-                st.error("🚫 権限エラー: Vector Store APIへのアクセス権限がありません。")
-            else:
-                st.error(f"❌ Vector Storeの取得に失敗しました: {error_message}")
-
-            # フォールバック: デフォルトのVector Store
-            st.info("💡 フォールバック: デフォルトのVector Storeを使用します。")
-            fallback_stores = [{
-                "id"         : "vs_68345a403a548191817b3da8404e2d82",
-                "name"       : "デフォルト Vector Store (フォールバック)",
-                "created_at" : time.time(),
-                "bytes"      : 0,
-                "file_counts": {"total": "不明", "completed": "不明", "failed": 0, "in_progress": 0}
-            }]
-            return fallback_stores
-
-    def _clear_vector_stores_cache(self):
-        """Vector Storeキャッシュをクリア"""
-        self._vector_stores_cache = None
-        self._cache_timestamp = None
-        st.success("✅ キャッシュをクリアしました")
-
-    def _get_vector_store_selection(self) -> Optional[Dict[str, Any]]:
-        """Vector Store選択UIとデータ取得"""
-        vector_stores = self._get_vector_stores()
-
-        if not vector_stores:
-            return None
-
-        # セレクタ用の選択肢を作成
-        options = []
-        for vs in vector_stores:
-            # ファイル数情報
-            file_counts = vs.get('file_counts', {})
-            total_files = file_counts.get('total', 0)
-            completed_files = file_counts.get('completed', 0)
-            file_info = f"({completed_files}/{total_files} files)"
-
-            # 容量情報
-            bytes_size = vs.get('bytes', 0)
-            if bytes_size > 0:
-                mb_size = bytes_size / (1024 * 1024)
-                size_info = f" | {mb_size:.1f}MB"
-            else:
-                size_info = ""
-
-            option_text = f"📂 {vs['name']} - {vs['id'][:20]}... {file_info}{size_info}"
-            options.append(option_text)
-
-        # Vector Store選択
-        selected_index = st.selectbox(
-            "📂 Vector Storeを選択",
-            range(len(options)),
-            format_func=lambda x: options[x],
-            key=f"vs_select_{self.safe_key}",
-            help="検索対象のVector Storeを選択してください"
-        )
-
-        return vector_stores[selected_index]
-
-    def _execute_ai_search(self, vector_store_id: str, query: str, max_results: int = 5):
-        """Responses APIを使用したAI検索の実行"""
-        try:
-            # FileSearchツールパラメータの作成
-            fs_tool = FileSearchToolParam(
-                type="file_search",
-                vector_store_ids=[vector_store_id],
-                max_num_results=max_results
-            )
-
-            # 実行時間を測定
-            start_time = time.time()
-
-            with st.spinner("🤖 AI検索中..."):
-                # API呼び出し
-                response = self.call_api_unified(
-                    messages=[EasyInputMessageParam(role="user", content=query)],
-                    tools=[fs_tool],
-                    include=["file_search_call.results"]
-                )
-
-            execution_time = time.time() - start_time
-
-            # 結果表示
-            st.success(f"✅ AI検索完了 ({execution_time:.2f}秒)")
-
-            # メイン回答の表示
-            st.subheader("🤖 AI回答")
-            ResponseProcessorUI.display_response(response, show_details=False)
-
-            # FileSearch詳細結果の表示
-            if hasattr(response, "file_search_call") and response.file_search_call:
-                with st.expander("📄 FileSearch詳細結果", expanded=True):
-                    if hasattr(response.file_search_call, "results") and response.file_search_call.results:
-                        self._display_ai_search_results(response.file_search_call.results)
-                    else:
-                        st.info("ℹ️ 詳細な検索結果が返されませんでした")
-            else:
-                st.info("ℹ️ FileSearch呼び出し結果が見つかりませんでした")
-
-            # パフォーマンス情報
-            self._show_performance_info(response, execution_time, vector_store_id, max_results)
-
-        except Exception as e:
-            self.handle_error(e)
-            logger.error(f"AI検索実行エラー: {e}")
-
-    def _execute_direct_search(self, vector_store_id: str, query: str, max_results: int = 10,
-                               rewrite_query: bool = False):
-        """Vector Store APIを使用した直接検索の実行"""
-        try:
-            start_time = time.time()
-
-            with st.spinner("🔍 直接検索中..."):
-                # より明確なアクセス方法
-                openai_client = self.client.client
-                search_response = openai_client.vector_stores.search(
-                    vector_store_id=vector_store_id,
-                    query=query,
-                    max_num_results=max_results,
-                    rewrite_query=rewrite_query
-                )
-
-            execution_time = time.time() - start_time
-
-            # 結果表示
-            st.success(f"✅ 直接検索完了 ({execution_time:.2f}秒)")
-
-            # 検索情報の表示
-            st.subheader("🔍 検索情報")
-            col1, col2 = st.columns(2)
-            with col1:
-                st.write(f"**検索クエリ**: {getattr(search_response, 'search_query', query)}")
-                st.write(f"**結果数**: {len(search_response.data)}件")
-            with col2:
-                st.write(f"**実行時間**: {execution_time:.2f}秒")
-                st.write(f"**次ページ有無**: {'有り' if getattr(search_response, 'has_more', False) else '無し'}")
-
-            # 直接検索結果の表示
-            self._display_direct_search_results(search_response.data)
-
-        except Exception as e:
-            self.handle_error(e)
-            logger.error(f"直接検索実行エラー: {e}")
-
-    def _display_ai_search_results(self, results: List[Any]):
-        """AI検索結果の表示"""
-        try:
-            if not results:
-                st.info("🔍 検索結果がありません")
-                return
-
-            st.write(f"**検索結果件数**: {len(results)}件")
-
-            for i, result in enumerate(results, 1):
-                with st.expander(f"📄 結果 {i}", expanded=i <= 2):
-                    # メインコンテンツの表示
-                    if hasattr(result, 'content'):
-                        content = result.content
-                        st.write("**内容**:")
-                        if len(content) > 500:
-                            st.text_area(
-                                "検索結果内容",
-                                content,
-                                height=150,
-                                key=f"ai_content_{i}_{self.safe_key}",
-                                help="検索でヒットした文書の内容"
-                            )
-                        else:
-                            st.markdown(f"> {content}")
-
-                    # メタデータ情報
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        if hasattr(result, 'file_name'):
-                            st.write(f"**📄 ファイル名**: {result.file_name}")
-                        if hasattr(result, 'file_id'):
-                            st.write(f"**🆔 ファイルID**: {result.file_id}")
-                    with col2:
-                        if hasattr(result, 'score'):
-                            st.write(f"**🎯 関連度**: {result.score:.4f}")
-
-                    # デバッグ情報
-                    if config.get("experimental.debug_mode", False):
-                        with st.expander("🔧 Raw Data", expanded=False):
-                            safe_streamlit_json(result)
-
-        except Exception as e:
-            st.error(f"❌ AI検索結果表示エラー: {e}")
-
-    def _display_direct_search_results(self, results: List[Any]):
-        """直接検索結果の表示"""
-        try:
-            if not results:
-                st.info("🔍 検索結果がありません")
-                return
-
-            st.subheader("📋 検索結果")
-
-            for i, result in enumerate(results, 1):
-                # スコアによる色分け
-                score = getattr(result, 'score', 0)
-                if score >= 0.9:
-                    score_color = "🟢"  # 高関連度
-                elif score >= 0.7:
-                    score_color = "🟡"  # 中関連度
-                else:
-                    score_color = "🔴"  # 低関連度
-
-                with st.expander(f"{score_color} 結果 {i} (スコア: {score:.3f})", expanded=i <= 3):
-                    # ファイル情報
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        if hasattr(result, 'filename'):
-                            st.write(f"**📄 ファイル名**: {result.filename}")
-                        if hasattr(result, 'file_id'):
-                            st.write(f"**🆔 ファイルID**: {result.file_id}")
-                    with col2:
-                        st.write(f"**🎯 スコア**: {score:.4f}")
-
-                    # コンテンツ表示
-                    if hasattr(result, 'content') and result.content:
-                        st.write("**📝 コンテンツ**:")
-                        for content_item in result.content:
-                            if hasattr(content_item, 'type') and content_item.type == "text":
-                                text_content = getattr(content_item, 'text', '')
-                                if len(text_content) > 500:
-                                    st.text_area(
-                                        "コンテンツ",
-                                        text_content,
-                                        height=150,
-                                        key=f"direct_content_{i}_{self.safe_key}"
-                                    )
-                                else:
-                                    st.markdown(f"> {text_content}")
-
-                    # 属性情報
-                    if hasattr(result, 'attributes') and result.attributes:
-                        st.write("**🏷️ 属性**:")
-                        for key, value in result.attributes.items():
-                            st.write(f"- **{key}**: {value}")
-
-                    # デバッグ情報
-                    if config.get("experimental.debug_mode", False):
-                        with st.expander("🔧 Raw Data", expanded=False):
-                            safe_streamlit_json(result)
-
-        except Exception as e:
-            st.error(f"❌ 直接検索結果表示エラー: {e}")
-
-    def _show_performance_info(self, response: Any, execution_time: float, vector_store_id: str, max_results: int):
-        """パフォーマンス情報の表示"""
-        with st.expander("📊 実行情報", expanded=False):
-            col1, col2 = st.columns(2)
-
-            with col1:
-                st.write("**実行詳細**")
-                st.write(f"- 実行時間: {execution_time:.2f}秒")
-                st.write(f"- Vector Store ID: `{vector_store_id}`")
-                st.write(f"- 最大検索結果数: {max_results}")
-                st.write(f"- 使用モデル: {self.get_model()}")
-
-            with col2:
-                if hasattr(response, 'usage') and response.usage:
-                    st.write("**トークン使用量**")
-                    usage_data = ResponseProcessor._serialize_usage(response.usage)
-
-                    prompt_tokens = usage_data.get('prompt_tokens', 0)
-                    completion_tokens = usage_data.get('completion_tokens', 0)
-                    total_tokens = usage_data.get('total_tokens', 0)
-
-                    st.write(f"- 入力: {prompt_tokens:,} tokens")
-                    st.write(f"- 出力: {completion_tokens:,} tokens")
-                    st.write(f"- 合計: {total_tokens:,} tokens")
-
-                    # コスト計算
-                    model = self.get_model()
-                    cost = TokenManager.estimate_cost(prompt_tokens, completion_tokens, model)
-                    st.write(f"- **推定コスト**: ${cost:.6f}")
-
-    def show_debug_info(self):
-        """デバッグ情報の表示（拡張版）"""
-        super().show_debug_info()
-
-        if config.get("experimental.debug_mode", False):
-            with st.sidebar.expander("🔍 FileSearch Debug", expanded=False):
-                st.write("**API情報**")
-                st.write("- 使用API: Vector Stores API")
-                st.write("- エンドポイント: /v1/vector_stores")
-
-                st.write("**キャッシュ状態**")
-                if self._vector_stores_cache:
-                    st.write(f"- キャッシュされたVector Store数: {len(self._vector_stores_cache)}")
-                    if self._cache_timestamp:
-                        cache_age = time.time() - self._cache_timestamp
-                        st.write(f"- キャッシュ経過時間: {cache_age:.1f}秒")
-                else:
-                    st.write("- キャッシュなし")
-
-                if st.button("キャッシュ強制クリア", key="debug_clear_cache"):
-                    self._clear_vector_stores_cache()
 
 # ==================================================
 # WebSearch Toolsデモ
 # ==================================================
 class WebSearchToolsDemo(BaseDemo):
-    """WebSearch専用デモ（統一化版）"""
+    """自然言語による天気検索デモ（AI + OpenWeatherMap API連携）"""
+    
+    # 都市エリア→都市名マッピング辞書
+    AREA_TO_CITY_MAPPING = {
+        "新宿": "Tokyo", "渋谷": "Tokyo", "池袋": "Tokyo", "銀座": "Tokyo", 
+        "品川": "Tokyo", "秋葉原": "Tokyo", "浅草": "Tokyo", "上野": "Tokyo",
+        "六本木": "Tokyo", "恵比寿": "Tokyo", "原宿": "Tokyo", "表参道": "Tokyo",
+        "梅田": "Osaka", "なんば": "Osaka", "心斎橋": "Osaka", "天王寺": "Osaka",
+        "神戸": "Kobe", "三宮": "Kobe", "元町": "Kobe",
+        "みなとみらい": "Yokohama", "関内": "Yokohama", "中華街": "Yokohama",
+        "博多": "Fukuoka", "天神": "Fukuoka",
+        "すすきの": "Sapporo", "大通": "Sapporo",
+        "栄": "Nagoya", "名駅": "Nagoya"
+    }
 
     @error_handler_ui
     @timer_ui
     def run(self):
-        """デモの実行（統一化版）"""
+        """自然言語天気検索デモの実行"""
         self.initialize()
-        st.header("WebSearch Toolsデモ　API情報")
-        with st.expander("利用：WebSearch Toolsデモ", expanded=False):
+        st.write("サブアプリ：WeatherSearchDemo (改修版)")
+        st.header("自然言語対応: 天気検索デモ")
+        st.write(
+            "自然言語で天気を検索できます。例：『明日の東京の天気は？』『新宿の天気を教えて』等の文章から"
+            "都市を抽出し、OpenWeather APIで天気情報を取得します。AI + 外部API連携の実装例。"
+        )
+        with st.expander("利用技術：Anthropic AI + OpenWeatherMap API", expanded=False):
             st.code("""
-            user_location = UserLocation(
-                type="approximate",
-                country="JP",
-                city="Tokyo",
-                region="Tokyo"
-            )
-
-            ws_tool = WebSearchToolParam(
-                type="web_search_preview",
-                user_location=user_location,
-                search_context_size=context_size
-            )
+            # 必要な環境変数
+            export ANTHROPIC_API_KEY='your-anthropic-key'
+            export OPENWEATHER_API_KEY='your-openweather-key'
             
-            default_query = config.get("samples.prompts.weather_query",
-                                   "週末の東京の新宿の天気とおすすめの屋内アクティビティは？")
-            query = st.text_input("検索クエリ", value=default_query)
+            # Step 1: AI による都市名抽出
+            messages = [MessageParam(
+                role="user",
+                content=f"以下の文章から都市名を抽出してください: {user_input}"
+            )]
             
-            response = self.call_api_unified(
-                    messages=[EasyInputMessageParam(role="user", content=query)],
-                    tools=[ws_tool]
-                )
-                ┗# API呼び出しパラメータの準備
-                api_params = {
-                    "input": messages,
-                    "model": model
-                }
-                self.client.create_response(**api_params)
-                
-            ResponseProcessorUI.display_response(response)
-                
+            # Step 2: 都市データマッチング
+            matched_city = self._find_matching_city(extracted_city)
+            
+            # Step 3: OpenWeather API 呼び出し
+            weather_data = self._get_current_weather(lat, lon)
             """)
 
-        st.write(
-            "WebSearchツール専用デモ。WebSearchToolParamで地域設定・検索コンテキストサイズを指定し、responses.create()でWeb検索を実行。日本の東京地域設定で実用的な検索機能を実装。")
+        # 自然言語入力UI
+        user_input = self._input_natural_language()
+        
+        # 天気検索ボタン
+        col1, col2, col3 = st.columns([2, 1, 2])
+        with col2:
+            weather_search = st.button(
+                "🌤️ 天気を検索",
+                key=f"weather_search_btn_{self.safe_key}",
+                use_container_width=True,
+                type="primary",
+                help="入力された文章から都市を抽出して天気を検索します"
+            )
 
-        default_query = config.get("samples.prompts.weather_query",
-                                   "週末の東京の新宿の天気とおすすめの屋内アクティビティは？")
-        query = st.text_input("検索クエリ", value=default_query)
+        # APIキーの確認
+        if not self._check_required_api_keys():
+            return
 
-        # Literal型の制約に対応
-        context_size: Literal["low", "medium", "high"] = st.selectbox(
-            "検索コンテキストサイズ",
-            ["low", "medium", "high"],
-            index=1,
-            key=f"ws_context_{self.safe_key}"
+        # 天気検索ボタンが押された場合
+        if weather_search and user_input:
+            st.info(f"🔍 『{user_input}』を解析中...")
+            self._process_weather_search(user_input)
+    
+    def _input_natural_language(self) -> str:
+        """自然言語入力UI"""
+        st.subheader("📝 天気を知りたい場所を教えてください")
+        st.write("例：『明日の東京の天気は？』『新宿の天気を教えて』『大阪は雨が降る？』等")
+        
+        # 自然言語入力
+        user_input = st.text_area(
+            "天気を知りたい場所を自由に入力してください",
+            value=config.get("samples.prompts.search_query", "明日の東京の新宿の天気は？"),
+            key=f"weather_input_{self.safe_key}",
+            help="日本の都市名やエリア名を含む文章を入力してください",
+            height=100
         )
-
-        if st.button("WebSearch実行", key=f"ws_exec_{self.safe_key}"):
-            self._execute_web_search(query, context_size)
-
-    def _execute_web_search(self, query: str, context_size: Literal["low", "medium", "high"]):
-        """WebSearchの実行（統一化版）"""
+        
+        return user_input.strip()
+    
+    def _check_required_api_keys(self) -> bool:
+        """APIキーの確認"""
+        # Anthropic APIキー確認
+        anthropic_key = os.getenv("ANTHROPIC_API_KEY")
+        if not anthropic_key:
+            st.warning("⚠️ ANTHROPIC_API_KEY環境変数が設定されていません")
+            st.info("AIによる都市名抽出には、Anthropic APIキーが必要です。")
+            st.code("export ANTHROPIC_API_KEY='your-anthropic-key'", language="bash")
+            return False
+            
+        # OpenWeather APIキー確認
+        weather_key = os.getenv("OPENWEATHER_API_KEY")
+        if not weather_key:
+            st.warning("⚠️ OPENWEATHER_API_KEY環境変数が設定されていません")
+            st.info("天気情報の取得には、OpenWeatherMap APIキーが必要です。")
+            st.code("export OPENWEATHER_API_KEY='your-openweather-key'", language="bash")
+            st.info("**登録URL:** https://openweathermap.org/api")
+            return False
+            
+        return True
+    
+    def _process_weather_search(self, user_input: str):
+        """天気検索の処理メインロジック"""
         try:
-            user_location = UserLocation(
-                type="approximate",
-                country="JP",
-                city="Tokyo",
-                region="Tokyo"
-            )
+            # 実行時間の計測開始
+            start_time = time.time()
 
-            ws_tool = WebSearchToolParam(
-                type="web_search_preview",
-                user_location=user_location,
-                search_context_size=context_size
-            )
+            # Step 1: AIで都市名を抽出
+            with st.spinner("🤖 AIで都市名を抽出中..."):
+                extracted_city = self._extract_city_with_ai(user_input)
 
-            with st.spinner("検索中..."):
-                response = self.call_api_unified(
-                    messages=[EasyInputMessageParam(role="user", content=query)],
-                    tools=[ws_tool]
-                )
+            if not extracted_city:
+                st.error("❌ 都市名を抽出できませんでした。日本の都市名やエリア名を含む文章で再度お試しください。")
+                return
 
-            st.subheader("検索結果")
-            ResponseProcessorUI.display_response(response)
+            st.success(f"✅ 抽出された都市: {extracted_city}")
+
+            # Step 2: 都市データマッチング
+            with st.spinner("🗺️ 都市データでマッチング中..."):
+                matched_city_data = self._find_matching_city(extracted_city)
+
+            if not matched_city_data:
+                st.error(f"❌ '{extracted_city}'に一致する都市が見つかりませんでした。")
+                return
+
+            city_name, lat, lon = matched_city_data
+            st.success(f"✅ マッチした都市: {city_name} ({lat:.4f}, {lon:.4f})")
+
+            # マッチ情報表示
+            with st.expander("🗺️ マッチした都市情報", expanded=True):
+                col1, col2, col3, col4 = st.columns(4)
+                with col1:
+                    st.metric("入力文", user_input[:20] + "..." if len(user_input) > 20 else user_input)
+                with col2:
+                    st.metric("抽出都市", extracted_city)
+                with col3:
+                    st.metric("マッチ都市", city_name)
+                with col4:
+                    st.metric("座標", f"{lat:.2f}, {lon:.2f}")
+
+            # Step 3: OpenWeather APIで天気取得
+            with st.spinner(f"🌤️ {city_name}の天気情報を取得中..."):
+                weather_data = self._get_weather_data(lat, lon, city_name)
+
+            if weather_data:
+                st.success("✅ 天気情報を取得しました")
+                self._display_weather_results(weather_data, user_input, extracted_city, city_name)
+
+            # 実行時間の表示
+            end_time = time.time()
+            execution_time = end_time - start_time
+
+            with st.expander("🔧 処理詳細", expanded=False):
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("実行時間", f"{execution_time:.2f}秒")
+                with col2:
+                    st.metric("API呼び出し数", "3回")  # AI抽出 + 現在天気 + 5日間予報
+                with col3:
+                    st.metric("データ形式", "JSON")
+
+                st.write("**処理ステップ:**")
+                st.write("1. Anthropic AI: 自然言語から都市名抽出")
+                st.write("2. ローカル処理: 都市データマッチング")
+                st.write("3. OpenWeatherMap API: 天気情報取得")
+                st.write("- データ更新頻度: リアルタイム")
 
         except Exception as e:
-            self.handle_error(e)
+            st.error(f"❌ 天気検索処理に失敗しました: {str(e)}")
+            logger.error(f"Weather search error: {e}")
+
+            # エラーの詳細表示（デバッグモード時）
+            if config.get("experimental.debug_mode", False):
+                with st.expander("🔧 エラー詳細", expanded=False):
+                    st.exception(e)
+    
+    def _execute_search(self, search_api: str, query: str, results_count: int, api_params: dict) -> List[dict]:
+        """検索の実行（改修版）"""
+        if search_api == "ダミーデータ":
+            # ダミーデータを返す
+            return [
+                {
+                    'title': f'ダミー検索結果 {i+1}: {query}に関する情報',
+                    'url': f'https://example.com/result{i+1}',
+                    'snippet': f'これは{query}に関するダミーの検索結果です。実際の検索APIを使用する場合は、適切なAPIキーを設定してください。'
+                }
+                for i in range(results_count)
+            ]
+        
+        elif search_api == "Google Custom Search":
+            return self._google_search(query, results_count)
+        
+        elif search_api == "Bing Search":
+            return self._bing_search(query, results_count)
+            
+        elif search_api == "SerpAPI":
+            return self._serp_search(query, results_count)
+        
+        else:
+            raise ValueError(f"サポートされていない検索API: {search_api}")
+    
+    def _extract_city_with_ai(self, user_input: str) -> str:
+        """自然言語からAIで都市名を抽出"""
+        try:
+            messages = [
+                EasyInputMessageParam(
+                    role="user",
+                    content=f"""
+以下の文章から日本の都市名やエリア名を抽出してください。
+
+入力文: {user_input}
+
+条件:
+- 日本の都市名やエリア名のみ抽出してください
+- 一番重要で明確な都市名・エリア名を一つだけ選んでください
+- 都市名のみを答えてください（説明は不要）
+- 見つからない場合は「NOT_FOUND」と答えてください
+
+例:
+- 「明日の東京の天気は？」→ 東京
+- 「新宿の天気を教えて」→ 新宿  
+- 「大阪は雨が降る？」→ 大阪
+                    """
+                )
+            ]
+            
+            response = self.call_api_unified(messages=messages)
+            if response and hasattr(response, 'content'):
+                extracted_text = response.content[0].text.strip() if response.content else ""
+                return extracted_text if extracted_text != "NOT_FOUND" else None
+            return None
+            
+        except Exception as e:
+            st.error(f"❌ AIでの都市名抽出エラー: {e}")
+            logger.error(f"City extraction error: {e}")
+            return None
+    
+    def _find_matching_city(self, extracted_city: str) -> tuple:
+        """抽出された都市名を都市データでマッチング"""
+        try:
+            # city_jp.list.jsonを読み込み
+            cities_json = config.get("paths.cities_json", "data/city_jp.list.json")
+            if not Path(cities_json).exists():
+                st.error(f"都市データファイルが見つかりません: {cities_json}")
+                return None
+            
+            # 日本の都市データ読み込み（WeatherDemoと同じロジック）
+            with open(cities_json, "r", encoding="utf-8") as f:
+                cities_list = json.load(f)
+            
+            cities_df = pd.DataFrame([
+                {
+                    "name": city["name"],
+                    "lat" : city["coord"]["lat"],
+                    "lon" : city["coord"]["lon"],
+                    "id"  : city["id"]
+                }
+                for city in cities_list
+            ])
+            
+            # 1. エリア→都市マッピングをチェック
+            if extracted_city in self.AREA_TO_CITY_MAPPING:
+                target_city = self.AREA_TO_CITY_MAPPING[extracted_city]
+                st.info(f"🗺️ エリア '{extracted_city}' を都市 '{target_city}' にマッピングしました")
+            else:
+                target_city = extracted_city
+            
+            # 2. 完全一致検索
+            exact_match = cities_df[cities_df["name"].str.contains(target_city, case=False, na=False)]
+            if not exact_match.empty:
+                row = exact_match.iloc[0]
+                return row["name"], row["lat"], row["lon"]
+            
+            # 3. 部分一致検索
+            partial_match = cities_df[cities_df["name"].str.contains(target_city, case=False, na=False)]
+            if not partial_match.empty:
+                row = partial_match.iloc[0]
+                return row["name"], row["lat"], row["lon"]
+            
+            # 4. 類似度マッチング（difflib使用）
+            import difflib
+            city_names = cities_df["name"].tolist()
+            close_matches = difflib.get_close_matches(target_city, city_names, n=1, cutoff=0.6)
+            if close_matches:
+                matched_name = close_matches[0]
+                row = cities_df[cities_df["name"] == matched_name].iloc[0]
+                st.info(f"🔍 類似マッチング: '{target_city}' → '{matched_name}'")
+                return row["name"], row["lat"], row["lon"]
+            
+            return None
+            
+        except Exception as e:
+            st.error(f"❌ 都市マッチングエラー: {e}")
+            logger.error(f"City matching error: {e}")
+            return None
+    
+    def _get_weather_data(self, lat: float, lon: float, city_name: str) -> dict:
+        """OpenWeather APIで天気データを取得（WeatherDemoと統合）"""
+        try:
+            # 現在の天気取得
+            current_weather = self._get_current_weather(lat, lon)
+            
+            # 5日間予報取得
+            forecast_data = self._get_weekly_forecast(lat, lon)
+            
+            return {
+                "current": current_weather,
+                "forecast": forecast_data,
+                "city_name": city_name,
+                "coordinates": {"lat": lat, "lon": lon}
+            }
+            
+        except Exception as e:
+            st.error(f"❌ 天気データ取得エラー: {e}")
+            logger.error(f"Weather data error: {e}")
+            return None
+    
+    def _get_current_weather(self, lat: float, lon: float, unit: str = "metric") -> dict:
+        """現在の天気を取得（WeatherDemoから流用）"""
+        api_key = os.getenv("OPENWEATHER_API_KEY")
+        if not api_key:
+            return None
+
+        try:
+            url = "http://api.openweathermap.org/data/2.5/weather"
+            params = {
+                "lat"  : lat,
+                "lon"  : lon,
+                "appid": api_key,
+                "units": unit,
+                "lang" : "ja"  # 日本語での天気説明
+            }
+
+            response = requests.get(url, params=params, timeout=config.get("api.timeout", 30))
+            response.raise_for_status()
+            data = response.json()
+
+            return {
+                "city"       : data["name"],
+                "temperature": round(data["main"]["temp"], 1),
+                "description": data["weather"][0]["description"],
+                "coord"      : data["coord"],
+                "humidity"   : data["main"]["humidity"],
+                "pressure"   : data["main"]["pressure"],
+                "wind_speed" : data.get("wind", {}).get("speed", 0)
+            }
+        except Exception as e:
+            logger.error(f"Current weather API error: {e}")
+            return None
+    
+    def _get_weekly_forecast(self, lat: float, lon: float, unit: str = "metric") -> list:
+        """5日間予報を取得（WeatherDemoから流用）"""
+        api_key = os.getenv("OPENWEATHER_API_KEY")
+        if not api_key:
+            return []
+
+        try:
+            url = "http://api.openweathermap.org/data/2.5/forecast"
+            params = {
+                "lat"  : lat,
+                "lon"  : lon,
+                "appid": api_key,
+                "units": unit,
+                "lang" : "ja"
+            }
+
+            response = requests.get(url, params=params, timeout=config.get("api.timeout", 30))
+            response.raise_for_status()
+            data = response.json()
+
+            # 3時間毎データを日別に集約
+            daily_data = {}
+            for item in data.get("list", []):
+                date_str = datetime.fromtimestamp(item["dt"]).strftime("%Y-%m-%d")
+                if date_str not in daily_data:
+                    daily_data[date_str] = []
+                daily_data[date_str].append({
+                    "temp": item["main"]["temp"],
+                    "weather": item["weather"][0]["description"]
+                })
+
+            # 日別平均を計算
+            forecast = []
+            for date_str in sorted(daily_data.keys()):
+                temps = [d["temp"] for d in daily_data[date_str]]
+                avg_temp = sum(temps) / len(temps) if temps else 0
+                weather_desc = daily_data[date_str][0]["weather"]  # 最初の天気を代表とする
+
+                forecast.append({
+                    "date": date_str,
+                    "temp_avg": round(avg_temp, 1),
+                    "weather": weather_desc
+                })
+
+            return forecast[:5]  # 5日分のみ
+        except Exception as e:
+            logger.error(f"Weekly forecast API error: {e}")
+            return []
+    
+    def _display_weather_results(self, weather_data: dict, user_input: str, extracted_city: str, matched_city: str):
+        """天気検索結果の表示"""
+        try:
+            current = weather_data.get("current", {})
+            forecast = weather_data.get("forecast", [])
+            
+            # 現在の天気表示
+            if current:
+                with st.container():
+                    st.write("### 🌤️ 現在の天気")
+                    
+                    col1, col2, col3, col4 = st.columns(4)
+                    with col1:
+                        st.metric("🏙️ 都市", current.get('city', matched_city))
+                    with col2:
+                        st.metric("🌡️ 気温", f"{current.get('temperature', 0)}℃")
+                    with col3:
+                        st.metric("💨 天気", current.get('description', 'N/A'))
+                    with col4:
+                        coord = current.get('coord', {})
+                        st.metric("📍 座標", f"{coord.get('lat', 0):.2f}, {coord.get('lon', 0):.2f}")
+            
+            # 5日間予報表示
+            if forecast:
+                with st.container():
+                    st.write("### 📅 5日間予報")
+                    
+                    forecast_df = pd.DataFrame(forecast)
+                    forecast_df = forecast_df.rename(columns={
+                        'date'    : '日付',
+                        'temp_avg': '平均気温(℃)',
+                        'weather' : '天気'
+                    })
+                    
+                    st.dataframe(
+                        forecast_df,
+                        use_container_width=True,
+                        hide_index=True
+                    )
+                    
+                    # 気温推移グラフ
+                    if len(forecast) > 1:
+                        st.write("### 📈 気温推移")
+                        temp_data = pd.DataFrame({
+                            '日付': [item['date'] for item in forecast],
+                            '平均気温': [item['temp_avg'] for item in forecast]
+                        })
+                        st.line_chart(temp_data.set_index('日付'))
+                        
+        except Exception as e:
+            st.error(f"❌ 天気結果表示エラー: {e}")
+            logger.error(f"Weather display error: {e}")
 
 
 # ==================================================
@@ -2293,83 +2483,7 @@ class WebSearchToolsDemo(BaseDemo):
 # ==================================================
 class ComputerUseDemo(BaseDemo):
     """Computer Use Tool のデモ（統一化版）"""
-
-    @error_handler_ui
-    @timer_ui
-    def run(self):
-        """デモの実行（統一化版）"""
-        self.initialize()
-        st.header("Computer Useデモ")
-        st.write("利用：OpenAI API")
-        st.warning("Computer Use APIは実験的な機能です。実行には特別な権限が必要です。")
-
-        model = "computer-use-preview"
-        st.write("使用モデル:", model)
-
-        instruction = st.text_area(
-            "実行指示",
-            value="ブラウザで https://news.ycombinator.com を開いて、"
-                  "トップ記事のタイトルをコピーしてメモ帳に貼り付けて",
-            height=100
-        )
-
-        # Literal型の制約に対応
-        environment: Literal["browser", "mac", "windows", "ubuntu", "linux"] = st.selectbox(
-            "実行環境",
-            ["browser", "mac", "windows", "ubuntu"],
-            key=f"cu_env_{self.safe_key}"
-        )
-
-        if st.button("Computer Use実行", key=f"cu_exec_{self.safe_key}"):
-            self._execute_computer_use(model, instruction, environment)
-
-    def _execute_computer_use(self, model: str, instruction: str,
-                              environment: Literal["windows", "mac", "linux", "ubuntu", "browser"]):
-        """Computer Useの実行（統一化版）"""
-        try:
-            cu_tool = ComputerToolParam(
-                type="computer_use_preview",
-                display_width=1280,
-                display_height=800,
-                environment=environment,
-            )
-
-            messages = [
-                EasyInputMessageParam(
-                    role="user",
-                    content=[
-                        ResponseInputTextParam(
-                            type="input_text",
-                            text=instruction
-                        )
-                    ]
-                )
-            ]
-
-            with st.spinner("実行中..."):
-                response = self.call_api_unified(
-                    messages=messages,
-                    model=model,
-                    tools=[cu_tool],
-                    truncation="auto",
-                    stream=False,
-                    include=["computer_call_output.output.image_url"]
-                )
-
-            st.subheader("実行結果")
-            ResponseProcessorUI.display_response(response)
-
-            # Computer Use特有の出力処理
-            for output in response.output:
-                if hasattr(output, 'type') and output.type == 'computer_call':
-                    st.subheader("Computer Use アクション")
-                    if hasattr(output, 'action'):
-                        st.write('実行アクション:', output.action)
-                    if hasattr(output, 'image_url'):
-                        st.image(output.image_url, caption="スクリーンショット")
-
-        except Exception as e:
-            self.handle_error(e)
+    pass
 
 # ==================================================
 # デモマネージャー
@@ -2384,15 +2498,14 @@ class DemoManager:
     def _initialize_demos(self) -> Dict[str, BaseDemo]:
         """デモインスタンスの初期化（統一化版）"""
         return {
-            "Text Responses (One Shot)"  : TextResponseDemo("Text Responses(one shot)"),
+            "Text Responses (One Shot)"  : TextResponseDemo("Anthropic API-Text Responses(one shot)"),
             "Text Responses (Memory)"    : MemoryResponseDemo("Text Responses(memory)"),
             "Image to Text 画像入力(URL)"   : ImageResponseDemo("Image_URL", use_base64=False),
             "Image to Text 画像入力(base64)": ImageResponseDemo("Image_Base64", use_base64=True),
             "Structured Output 構造化出力" : StructuredOutputDemo("Structured_Output_create", use_parse=False),
-            "Open Weather API" : WeatherDemo("OpenWeatherAPI"),
+            "Open Weather API(比較用)" : WeatherDemo("OpenWeatherAPI"),
             "File Search-Tool vector store": FileSearchVectorStoreDemo("FileSearch_vsid"),
-            "Tools - Web Search Tools"     : WebSearchToolsDemo("WebSearch"),
-            "Computer Use Tool Param"      : ComputerUseDemo("Computer_Use"),
+            "Tools - Weather Search (AI + API)": WebSearchToolsDemo("WeatherSearch"),
         }
 
     @error_handler_ui

@@ -127,6 +127,8 @@ paths:
   logs_dir: "logs"
   data_dir: "data"
   cache_dir: "cache"
+  images_dir: "images"
+  cities_json: "data/city_jp.list.json"
 
 # 国際化
 i18n:
@@ -136,7 +138,7 @@ i18n:
 # 制限設定
 limits:
   max_message_length: 200000  # メッセージの最大長
-  max_image_size_mb: 20       # 画像の最大サイズ（MB）
+  max_image_size_mb: 5        # 画像の最大サイズ（MB） - Anthropic APIの実際の制限
   max_file_uploads: 10        # 最大ファイルアップロード数
 
 # 機能フラグ

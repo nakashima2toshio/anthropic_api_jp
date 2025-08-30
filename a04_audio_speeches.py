@@ -721,10 +721,10 @@ async with async_client.beta.realtime.connect(model="gpt-4o-realtime-preview") a
             raise e
 
 # ==================================================
-# Chained Voice Agent デモ（統一化版）
+# Chained Voice Agent デモ(音声→チャット→音声)
 # ==================================================
 class ChainedVoiceAgentDemo(BaseDemo):
-    """Chained Voice Agent のデモ（統一化版）"""
+    """Chained Voice Agent のデモ"""
 
     @error_handler_ui
     @timer_ui
