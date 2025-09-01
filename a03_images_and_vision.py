@@ -20,17 +20,18 @@ import pandas as pd
 from pydantic import BaseModel, Field, ValidationError
 
 from anthropic import Anthropic
-from openai.types.responses import (
-    EasyInputMessageParam,
-    ResponseInputTextParam,
-    ResponseInputImageParam,
-    ResponseFormatTextJSONSchemaConfigParam,
-    ResponseTextConfigParam,
-    FileSearchToolParam,
-    WebSearchToolParam,
-    ComputerToolParam,
-    Response,
-)
+# OpenAI types をコメントアウト（Anthropic APIでは使用しない）
+# from openai.types.responses import (
+#     EasyInputMessageParam,
+#     ResponseInputTextParam,
+#     ResponseInputImageParam,
+#     ResponseFormatTextJSONSchemaConfigParam,
+#     ResponseTextConfigParam,
+#     FileSearchToolParam,
+#     WebSearchToolParam,
+#     ComputerToolParam,
+#     Response,
+# )
 
 # プロジェクトディレクトリの設定
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -44,15 +45,28 @@ try:
     from helper_st import (
         UIHelper, MessageManagerUI, ResponseProcessorUI,
         SessionStateManager, error_handler_ui, timer_ui,
-        InfoPanelManager, safe_streamlit_json
+        InfoPanelManager, safe_streamlit_json,
+        EasyInputMessageParam  # helper_st.pyから移動
     )
     from helper_api import (
         config, logger, TokenManager, AnthropicClient,
-        EasyInputMessageParam, ResponseInputTextParam,
         ConfigManager, MessageManager, sanitize_key,
         error_handler, timer, get_default_messages,
         ResponseProcessor, format_timestamp
     )
+    
+    # ResponseInputTextParamは存在しない可能性があるので、ダミー定義
+    class ResponseInputTextParam:
+        def __init__(self, type="input_text", text=""):
+            self.type = type
+            self.text = text
+    
+    class ResponseInputImageParam:
+        def __init__(self, type="input_image", image_url="", detail="auto"):
+            self.type = type
+            self.image_url = image_url
+            self.detail = detail
+            
 except ImportError as e:
     st.error(f"ヘルパーモジュールのインポートに失敗しました: {e}")
     st.info("必要なファイルが存在することを確認してください: helper_st.py, helper_api.py")
@@ -158,6 +172,43 @@ class URLImageToTextDemo(BaseDemo):
         st.write("## 実装例: 画像URL解析")
         st.write("画像URLを入力して、その画像を解析します。")
         
+        # Anthropic APIのメモ
+        with st.expander("📝 Anthropic API メモ", expanded=False):
+            st.code("""
+# Anthropic APIでの画像解析について
+
+Anthropic Claude APIは強力な画像解析機能を提供します。
+
+1. **画像入力形式**
+   - URL形式: 公開されている画像URLを直接指定
+   - Base64形式: ローカル画像をBase64エンコード
+
+2. **対応画像形式**
+   - JPEG, PNG, GIF, WebP
+   - 最大サイズ: 5MB
+   - 推奨解像度: 1568px以下
+
+3. **実装パターン**
+   ```python
+   messages = [{
+       "role": "user",
+       "content": [
+           {"type": "text", "text": "この画像を説明して"},
+           {"type": "image", "source": {
+               "type": "url",
+               "url": image_url
+           }}
+       ]
+   }]
+   ```
+
+4. **活用例**
+   - 画像の詳細な説明
+   - オブジェクト検出と分類
+   - テキスト抽出（OCR）
+   - 画像に基づく質問応答
+            """, language="python")
+        
         # 実装例サンプル表示
         with st.expander("📋 実装例コード", expanded=False):
             st.code("""
@@ -179,7 +230,7 @@ messages = [
 response = client.responses.create(model=model, input=messages)
             """, language="python")
         
-        # 入力エリア
+        st.write("---")
         st.subheader("📤 入力")
         
         # 画像URL入力
@@ -212,28 +263,26 @@ response = client.responses.create(model=model, input=messages)
     def _process_image_with_text(self, prompt: str, image_url: str):
         """画像とテキストの処理"""
         try:
-            # デフォルトメッセージを取得
-            messages = get_default_messages()
-            
-            # ユーザーメッセージを追加
-            messages.append(
-                EasyInputMessageParam(
-                    role="user",
-                    content=[
-                        ResponseInputTextParam(type="input_text", text=prompt),
-                        ResponseInputImageParam(
-                            type="input_image",
-                            image_url=image_url,
-                            detail="auto"
-                        )
-                    ]
-                )
-            )
+            # Anthropic API形式のメッセージを構築
+            messages = [{
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {
+                        "type": "image",
+                        "source": {
+                            "type": "url",
+                            "url": image_url
+                        }
+                    }
+                ]
+            }]
             
             with st.spinner("処理中..."):
-                response = self.client.responses.create(
+                response = self.client.messages.create(
                     model=self.model,
-                    input=messages,
+                    messages=messages,
+                    max_tokens=1024
                 )
             
             st.success("応答を取得しました")
@@ -253,6 +302,45 @@ class Base64ImageToTextDemo(BaseDemo):
         """Base64画像からテキスト生成デモの実行"""
         st.write("## 実装例: ローカル画像解析（Base64）")
         st.write("ローカルの画像ファイルを選択して解析します。")
+        
+        # Anthropic APIのメモ
+        with st.expander("📝 Anthropic API メモ", expanded=False):
+            st.code("""
+# Base64エンコード画像の処理について
+
+ローカル画像をAnthropicAPIで処理する際の手順：
+
+1. **画像の読み込みとエンコード**
+   ```python
+   import base64
+   with open(image_path, "rb") as f:
+       image_data = base64.b64encode(f.read()).decode('utf-8')
+   ```
+
+2. **メッセージ構築**
+   ```python
+   messages = [{
+       "role": "user",
+       "content": [
+           {"type": "text", "text": prompt},
+           {"type": "image", "source": {
+               "type": "base64",
+               "media_type": "image/jpeg",
+               "data": image_data
+           }}
+       ]
+   }]
+   ```
+
+3. **メリット**
+   - プライベート画像の処理が可能
+   - ネットワーク遅延の影響を受けない
+   - 画像の前処理が可能
+
+4. **注意点**
+   - ファイルサイズ制限: 5MB
+   - メモリ使用量に注意
+            """, language="python")
         
         # 実装例サンプル表示
         with st.expander("📋 実装例コード", expanded=False):
@@ -284,7 +372,7 @@ messages = [
 response = client.responses.create(model=model, input=messages)
             """, language="python")
         
-        # 入力エリア
+        st.write("---")
         st.subheader("📤 入力")
         
         self._handle_image_selection()
@@ -370,28 +458,39 @@ response = client.responses.create(model=model, input=messages)
                 st.error("画像のエンコードに失敗しました")
                 return
             
-            # デフォルトメッセージを取得
-            messages = get_default_messages()
+            # 画像のMIMEタイプを判定
+            if image_path.lower().endswith('.png'):
+                media_type = "image/png"
+            elif image_path.lower().endswith(('.jpg', '.jpeg')):
+                media_type = "image/jpeg"
+            elif image_path.lower().endswith('.gif'):
+                media_type = "image/gif"
+            elif image_path.lower().endswith('.webp'):
+                media_type = "image/webp"
+            else:
+                media_type = "image/jpeg"  # デフォルト
             
-            # Pydantic モデルを用いて入力メッセージを構築
-            messages.append(
-                EasyInputMessageParam(
-                    role="user",
-                    content=[
-                        ResponseInputTextParam(type="input_text", text=prompt),
-                        ResponseInputImageParam(
-                            type="input_image",
-                            image_url=f"data:image/png;base64,{image_base64}",
-                            detail="auto"
-                        ),
-                    ],
-                )
-            )
+            # Anthropic API形式のメッセージを構築
+            messages = [{
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {
+                        "type": "image",
+                        "source": {
+                            "type": "base64",
+                            "media_type": media_type,
+                            "data": image_base64
+                        }
+                    }
+                ]
+            }]
             
             with st.spinner("処理中..."):
-                response = self.client.responses.create(
+                response = self.client.messages.create(
                     model=self.model,
-                    input=messages,
+                    messages=messages,
+                    max_tokens=1024
                 )
             
             st.success("応答を取得しました")
@@ -409,11 +508,43 @@ class PromptToImageDemo(BaseDemo):
 
     def run_demo(self):
         """プロンプトから画像生成デモの実行"""
-        st.write("## 実装例: DALL-E画像生成")
-        st.write("テキストから画像を生成します（DALL-E 3使用）。")
+        st.write("## 実装例: 画像生成（Anthropic API制限事項）")
+        st.write("※注意: Anthropic Claude APIは画像生成機能を提供していません。")
         
-        # 実装例サンプル表示
-        with st.expander("📋 実装例コード", expanded=False):
+        # Anthropic APIのメモ
+        with st.expander("📝 Anthropic API メモ", expanded=False):
+            st.code("""
+# Anthropic APIと画像生成について
+
+Anthropic Claude APIの画像関連機能：
+
+1. **対応している機能**
+   ✅ 画像の解析・理解
+   ✅ 画像に関する質問応答
+   ✅ 画像内のテキスト読み取り（OCR）
+   ✅ 画像の詳細な説明生成
+
+2. **対応していない機能**
+   ❌ 画像の生成（DALL-Eのような機能）
+   ❌ 画像の編集・加工
+   ❌ 画像のスタイル変換
+
+3. **代替案**
+   画像生成が必要な場合の選択肢：
+   - OpenAI DALL-E API
+   - Stable Diffusion API
+   - Midjourney API
+   - その他の画像生成AI
+
+4. **Claudeの強み**
+   - 高精度な画像理解
+   - 複雑な画像分析
+   - マルチモーダル推論
+   - 詳細な説明文生成
+            """, language="python")
+        
+        # 実装例サンプル表示（代替案の提示）
+        with st.expander("📋 実装例コード（OpenAI DALL-E使用例）", expanded=False):
             st.code("""
 # DALL-E画像生成の実装例
 from anthropic import Anthropic
@@ -430,8 +561,9 @@ response = client.images.generate(
 image_url = response.data[0].url
             """, language="python")
         
-        # 入力エリア
-        st.subheader("📤 入力")
+        st.write("---")
+        st.subheader("📤 入力（デモンストレーション用）")
+        st.info("⚠️ このデモはAnthropic APIでは実行できません。OpenAI APIが必要です。")
         
         # 画像生成設定
         col1, col2, col3 = st.columns(3)
@@ -468,39 +600,32 @@ image_url = response.data[0].url
                 self._generate_image_from_prompt(model, prompt, size, quality)
     
     def _generate_image_from_prompt(self, model: str, prompt: str, size: str, quality: str):
-        """DALL-Eで画像生成"""
-        try:
-            with st.spinner("画像を生成中...（数秒かかります）"):
-                response = self.client.images.generate(
-                    model=model,
-                    prompt=prompt,
-                    size=size,
-                    quality=quality if model == "dall-e-3" else "standard",
-                    n=1
-                )
-            
-            # 生成された画像を表示
-            image_url = response.data[0].url
-            st.success("画像を生成しました")
-            st.subheader("🤖 生成結果")
-            st.image(image_url, caption="生成画像", use_container_width=True)
-            
-            # 画像URLを表示
-            st.text_input("画像URL（ダウンロード用）", value=image_url, key="generated_url")
-            
-            # 詳細情報
-            with st.expander("生成情報"):
-                st.write(f"**モデル**: {model}")
-                st.write(f"**サイズ**: {size}")
-                st.write(f"**品質**: {quality}")
-                st.write(f"**プロンプト**: {prompt}")
-                if hasattr(response.data[0], 'revised_prompt'):
-                    st.write(f"**修正されたプロンプト**: {response.data[0].revised_prompt}")
-            
-        except Exception as e:
-            st.error(f"画像生成エラー: {e}")
-            if config.get("experimental.debug_mode", False):
-                st.exception(e)
+        """DALL-Eで画像生成（Anthropic APIでは利用不可）"""
+        # Anthropic APIは画像生成をサポートしていないため、エラーメッセージを表示
+        st.error("⚠️ Anthropic Claude APIは画像生成機能を提供していません。")
+        st.info("💡 画像生成には以下のAPIをご利用ください：")
+        st.markdown("""
+        - **OpenAI DALL-E API** - 高品質な画像生成
+        - **Stable Diffusion API** - オープンソースの画像生成
+        - **Midjourney API** - 芸術的な画像生成
+        - **Google Imagen API** - Googleの画像生成
+        """)
+        
+        # デモ用のサンプル画像を表示
+        st.subheader("🎨 サンプル画像（デモ用）")
+        st.image(
+            "https://via.placeholder.com/512x512.png?text=Anthropic+API+Does+Not+Support+Image+Generation",
+            caption="これはプレースホルダー画像です",
+            use_container_width=False,
+            width=512
+        )
+        
+        # 入力されたプロンプトを表示
+        with st.expander("📝 入力されたプロンプト"):
+            st.write(f"**プロンプト**: {prompt}")
+            st.write(f"**指定モデル**: {model}")
+            st.write(f"**指定サイズ**: {size}")
+            st.write(f"**指定品質**: {quality}")
 
 
 # ==================================================

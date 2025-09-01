@@ -394,54 +394,125 @@ class EventExtractionDemo(BaseDemo):
         """デモの実行（統一化版）"""
         self.initialize()
         
-        with st.expander("Anthropic API(messages.create):実装例", expanded=False):
-            st.write(
-                "responses.parse()の構造化出力デモ。PydanticモデルのEventInfoに基づいてイベント情報を抽出。"
-                "テキストから名前・日付・参加者を自動的に構造化データとして取得。"
-            )
+        # 実装例の説明セクション（a05パターンを適用）
+        st.write("## 実装例: イベント情報の構造化抽出")
+        st.write("テキストからイベント名、日付、参加者などの情報を自動的に構造化データとして抽出します。")
+        
+        # APIメモセクション（a05パターンを適用）
+        with st.expander("📝 Anthropic API メモ", expanded=False):
             st.code("""
-            # Pydanticモデル定義
-            class EventInfo(BaseModel):
-                name: str = Field(..., description="イベント名")
-                date: str = Field(..., description="開催日")
-                participants: List[str] = Field(..., description="参加者一覧")
+# Anthropic APIでの構造化出力について
 
-            # responses.parse API呼び出し
-            response = self.call_api_parse(
-                input_text=user_text,
-                text_format=EventInfo,
-                temperature=temperature
-            )
-            event_info = response.output_parsed
-            """)
+Anthropic APIでは直接的なresponse_formatはサポートされていませんが、
+プロンプトエンジニアリングで構造化出力を実現できます：
 
+1. **JSON出力の指示**
+   - 明確なJSONスキーマをプロンプトに含める
+   - "Return ONLY valid JSON"などの指示を追加
+
+2. **Pydanticとの統合**
+   ```python
+   # スキーマ定義をプロンプトに含める
+   schema = model.model_json_schema()
+   prompt = f"Return JSON matching: {schema}"
+   ```
+
+3. **レスポンスの解析**
+   - JSONを抽出してPydanticモデルで検証
+   - ValidationErrorで不正な形式を検出
+            """, language="python")
+        
+        # 実装例コード（a05パターンで整理）
+        with st.expander("📋 実装例コード", expanded=False):
+            st.code("""
+# イベント情報抽出の実装例
+from anthropic import Anthropic
+from pydantic import BaseModel, Field
+from typing import List
+
+# Pydanticモデル定義
+class EventInfo(BaseModel):
+    name: str = Field(..., description="イベント名")
+    date: str = Field(..., description="開催日")
+    participants: List[str] = Field(..., description="参加者一覧")
+
+# クライアント初期化
+client = Anthropic()
+
+# 構造化プロンプトの作成
+schema = EventInfo.model_json_schema()
+prompt = f'''
+Extract event information from the following text:
+{user_text}
+
+Return JSON matching this schema:
+{json.dumps(schema, indent=2)}
+
+IMPORTANT: Return ONLY valid JSON.
+'''
+
+# API呼び出し
+response = client.messages.create(
+    model="claude-3-opus-20240229",
+    messages=[{"role": "user", "content": prompt}],
+    max_tokens=1024
+)
+
+# JSON解析とValidation
+import json
+response_text = response.content[0].text
+parsed_data = json.loads(response_text)
+event_info = EventInfo(**parsed_data)
+            """, language="python")
+        
+        # セパレーター
+        st.write("---")
+        
+        # 入力セクション（a05パターンを適用）
+        st.subheader("📤 入力")
+        
         # デフォルトテキスト
         default_text = config.get("samples.prompts.event_example",
                                  "台湾フェス2025 ～あつまれ！究極の台湾グルメ～ 開催日：5/3・5/4 参加者：森本さん、Lennonさん、佐藤さん")
-
-        st.write(f"**質問例**: {default_text}")
+        
+        st.info(f"💡 例: {default_text}")
 
         with st.form(key=f"event_form_{self.safe_key}"):
             user_text = st.text_area(
                 "イベント詳細を入力してください:",
-                value=default_text,
-                height=config.get("ui.text_area_height", 75)
+                value="",
+                height=config.get("ui.text_area_height", 75),
+                placeholder=default_text
             )
 
-            # 統一されたtemperatureコントロール
-            temperature = self.create_temperature_control(
-                default_temp=0.1,
-                help_text="構造化出力では低い値を推奨"
-            )
+            # パラメータセクション
+            col1, col2 = st.columns([2, 1])
+            with col1:
+                # 統一されたtemperatureコントロール
+                temperature = self.create_temperature_control(
+                    default_temp=0.1,
+                    help_text="構造化出力では低い値を推奨"
+                )
+            with col2:
+                max_tokens = st.number_input(
+                    "最大トークン数",
+                    min_value=100,
+                    max_value=4096,
+                    value=1024,
+                    step=100
+                )
 
-            submitted = st.form_submit_button("実行：イベント抽出")
+            submitted = st.form_submit_button("🚀 イベント情報を抽出", use_container_width=True)
 
         if submitted and user_text:
-            self._process_extraction(user_text, temperature)
+            self._process_extraction(user_text, temperature, max_tokens)
+        
+        # 結果表示セクション
+        self._display_results()
 
         self.show_debug_info()
 
-    def _process_extraction(self, user_text: str, temperature: Optional[float]):
+    def _process_extraction(self, user_text: str, temperature: Optional[float], max_tokens: int = 1024):
         """イベント抽出の処理（統一化版）"""
         # 実行回数を更新
         session_key = f"demo_state_{self.safe_key}"
@@ -456,14 +527,14 @@ class EventExtractionDemo(BaseDemo):
                 response = self.call_api_parse(
                     input_text=user_text,
                     text_format=EventInfo,
-                    temperature=temperature
+                    temperature=temperature,
+                    max_tokens=max_tokens
                 )
 
+            # セッション状態に保存
+            st.session_state[f"last_response_{self.safe_key}"] = response
+            st.session_state[f"last_extraction_{self.safe_key}"] = response.output_parsed
             st.success("✅ イベント情報の抽出が完了しました")
-            
-            # 結果表示
-            event_info = response.output_parsed
-            self._display_event_result(event_info, response)
 
         except (ValidationError, json.JSONDecodeError) as e:
             st.error("❌ 構造化データの解析に失敗しました")
@@ -471,6 +542,17 @@ class EventExtractionDemo(BaseDemo):
                 st.exception(e)
         except Exception as e:
             self.handle_error(e)
+    
+    def _display_results(self):
+        """結果の表示（a05パターンを適用）"""
+        if f"last_extraction_{self.safe_key}" in st.session_state:
+            st.write("---")
+            st.subheader("🤖 抽出結果")
+            
+            event_info = st.session_state[f"last_extraction_{self.safe_key}"]
+            response = st.session_state.get(f"last_response_{self.safe_key}")
+            
+            self._display_event_result(event_info, response)
 
     def _display_event_result(self, event_info: EventInfo, response):
         """イベント抽出結果の表示"""
@@ -516,53 +598,125 @@ class MathReasoningDemo(BaseDemo):
         """デモの実行（統一化版）"""
         self.initialize()
         
-        with st.expander("Anthropic API(messages.create):実装例", expanded=False):
-            st.write(
-                "responses.parse()の数学的推論デモ。MathReasoningモデルで段階的な解法プロセスを構造化。"
-                "複雑な数式を逐次的なステップに分解し、各段階の説明と計算結果を取得。"
-            )
+        # 実装例の説明セクション（a05パターンを適用）
+        st.write("## 実装例: 数学的推論の構造化")
+        st.write("数式を段階的な解法プロセスに分解し、各ステップの説明と計算結果を構造化データとして取得します。")
+        
+        # APIメモセクション（a05パターンを適用）
+        with st.expander("📝 Anthropic API メモ", expanded=False):
             st.code("""
-            # Pydanticモデル定義
-            class Step(BaseModel):
-                explanation: str = Field(..., description="このステップでの説明")
-                output: str = Field(..., description="このステップの計算結果")
+# Anthropic APIでの段階的推論について
 
-            class MathReasoning(BaseModel):
-                steps: List[Step] = Field(..., description="逐次的な解法ステップ")
-                final_answer: str = Field(..., description="最終解")
+複雑な問題を段階的に解く構造化出力：
 
-            # responses.parse API呼び出し
-            prompt = f"Solve the equation {expression} step by step..."
-            response = self.call_api_parse(
-                input_text=prompt,
-                text_format=MathReasoning,
-                temperature=temperature
-            )
-            """)
+1. **ステップバイステップの構造**
+   - 各ステップに説明と結果を含める
+   - 最終回答を明示的に分離
 
+2. **プロンプト設計**
+   ```python
+   prompt = '''
+   Solve step by step and return JSON:
+   - steps: array of {explanation, output}
+   - final_answer: string
+   '''
+   ```
+
+3. **利点**
+   - 推論過程の透明性
+   - エラーの特定が容易
+   - 教育的価値の向上
+            """, language="python")
+        
+        # 実装例コード（a05パターンで整理）
+        with st.expander("📋 実装例コード", expanded=False):
+            st.code("""
+# 数学的推論の実装例
+from anthropic import Anthropic
+from pydantic import BaseModel, Field
+from typing import List
+
+# Pydanticモデル定義
+class Step(BaseModel):
+    explanation: str = Field(..., description="このステップでの説明")
+    output: str = Field(..., description="このステップの計算結果")
+
+class MathReasoning(BaseModel):
+    steps: List[Step] = Field(..., description="逐次的な解法ステップ")
+    final_answer: str = Field(..., description="最終解")
+
+# クライアント初期化
+client = Anthropic()
+
+# 構造化プロンプトの作成
+schema = MathReasoning.model_json_schema()
+prompt = f'''
+Solve the equation step by step: {expression}
+
+Return JSON matching this schema:
+{json.dumps(schema, indent=2)}
+
+Provide clear explanations in Japanese.
+IMPORTANT: Return ONLY valid JSON.
+'''
+
+# API呼び出し
+response = client.messages.create(
+    model="claude-3-opus-20240229",
+    messages=[{"role": "user", "content": prompt}],
+    max_tokens=2048
+)
+
+# JSON解析とValidation
+response_text = response.content[0].text
+parsed_data = json.loads(response_text)
+math_result = MathReasoning(**parsed_data)
+            """, language="python")
+        
+        # セパレーター
+        st.write("---")
+        
+        # 入力セクション（a05パターンを適用）
+        st.subheader("📤 入力")
+        
         default_expression = "8x + 7 = -23"
-        st.write(f"**質問例**: {default_expression}")
+        st.info(f"💡 例: {default_expression}")
 
         with st.form(key=f"math_form_{self.safe_key}"):
             expression = st.text_input(
                 "解きたい式を入力してください:",
-                value=default_expression
+                value="",
+                placeholder=default_expression
             )
 
-            # 統一されたtemperatureコントロール
-            temperature = self.create_temperature_control(
-                default_temp=0.2,
-                help_text="数学的推論では低めの値を推奨"
-            )
+            # パラメータセクション
+            col1, col2 = st.columns([2, 1])
+            with col1:
+                # 統一されたtemperatureコントロール
+                temperature = self.create_temperature_control(
+                    default_temp=0.2,
+                    help_text="数学的推論では低めの値を推奨"
+                )
+            with col2:
+                max_tokens = st.number_input(
+                    "最大トークン数",
+                    min_value=500,
+                    max_value=4096,
+                    value=2048,
+                    step=100
+                )
 
-            submitted = st.form_submit_button("実行：思考ステップ生成")
+            submitted = st.form_submit_button("🚀 思考ステップを生成", use_container_width=True)
 
         if submitted and expression:
-            self._process_math_reasoning(expression, temperature)
+            self._process_math_reasoning(expression, temperature, max_tokens)
+        
+        # 結果表示セクション
+        self._display_results()
 
         self.show_debug_info()
 
-    def _process_math_reasoning(self, expression: str, temperature: Optional[float]):
+    def _process_math_reasoning(self, expression: str, temperature: Optional[float], max_tokens: int = 2048):
         """数学推論の処理（統一化版）"""
         # 実行回数を更新
         session_key = f"demo_state_{self.safe_key}"
@@ -581,17 +735,28 @@ class MathReasoningDemo(BaseDemo):
                 response = self.call_api_parse(
                     input_text=prompt,
                     text_format=MathReasoning,
-                    temperature=temperature
+                    temperature=temperature,
+                    max_tokens=max_tokens
                 )
 
+            # セッション状態に保存
+            st.session_state[f"last_response_{self.safe_key}"] = response
+            st.session_state[f"last_math_result_{self.safe_key}"] = response.output_parsed
             st.success("✅ 思考ステップの生成が完了しました")
-            
-            # 結果表示
-            math_result = response.output_parsed
-            self._display_math_result(math_result, response)
 
         except Exception as e:
             self.handle_error(e)
+    
+    def _display_results(self):
+        """結果の表示（a05パターンを適用）"""
+        if f"last_math_result_{self.safe_key}" in st.session_state:
+            st.write("---")
+            st.subheader("🤖 推論結果")
+            
+            math_result = st.session_state[f"last_math_result_{self.safe_key}"]
+            response = st.session_state.get(f"last_response_{self.safe_key}")
+            
+            self._display_math_result(math_result, response)
 
     def _display_math_result(self, math_result: MathReasoning, response):
         """数学推論結果の表示"""

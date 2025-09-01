@@ -34,25 +34,33 @@ try:
         SessionStateManager, error_handler_ui, timer_ui,
         InfoPanelManager as BaseInfoPanelManager,
         safe_streamlit_json,
+        EasyInputMessageParam  # helper_st.pyから移動
     )
     from helper_api import (
         config, logger, TokenManager, AnthropicClient,
-        EasyInputMessageParam, ResponseInputTextParam,
         ConfigManager, MessageManager, sanitize_key,
         error_handler, timer, get_default_messages,
         ResponseProcessor, format_timestamp
     )
+    
+    # ResponseInputTextParamは存在しない可能性があるので、ダミー定義
+    class ResponseInputTextParam:
+        def __init__(self, type="input_text", text=""):
+            self.type = type
+            self.text = text
+            
 except ImportError as e:
     st.error(f"ヘルパーモジュールのインポートに失敗しました: {e}")
     st.info("必要なファイルが存在することを確認してください: helper_st.py, helper_api.py")
     st.stop()
 
 from anthropic import Anthropic, AsyncAnthropic
-from openai.types.chat import (
-    ChatCompletionSystemMessageParam,
-    ChatCompletionUserMessageParam,
-    ChatCompletionMessageParam,
-)
+# OpenAI types をコメントアウト（Anthropic APIでは使用しない）
+# from openai.types.chat import (
+#     ChatCompletionSystemMessageParam,
+#     ChatCompletionUserMessageParam,
+#     ChatCompletionMessageParam,
+# )
 
 # ページ設定
 def setup_page_config():
@@ -279,18 +287,61 @@ class TextToSpeechDemo(BaseDemo):
     @timer_ui
     def run(self):
         self.initialize()
+        
+        st.write("## 実装例: Text to Speech (TTS)")
+        st.write("テキストを音声に変換してMP3ファイルを生成します。")
+        
+        # Anthropic APIのメモ
+        with st.expander("📝 Anthropic API メモ", expanded=False):
+            st.code("""
+# Anthropic APIと音声生成について
 
-        with st.expander("Anthropic Audio API:実装例", expanded=False):
-            st.write("テキストを音声に変換するTTSデモ。ストリーミング保存でMP3出力。")
+Anthropic Claude APIの音声関連機能：
+
+1. **現在の状況**
+   ❌ Anthropic Claude APIは音声生成機能を提供していません
+   ❌ 音声認識機能も提供していません
+
+2. **代替ソリューション**
+   TTS（Text-to-Speech）が必要な場合：
+   - OpenAI TTS API (tts-1, tts-1-hd)
+   - Google Cloud Text-to-Speech API
+   - Amazon Polly
+   - Azure Cognitive Services Speech
+   
+   STT（Speech-to-Text）が必要な場合：
+   - OpenAI Whisper API
+   - Google Cloud Speech-to-Text
+   - Amazon Transcribe
+   - Azure Speech Services
+
+3. **Claudeの強み**
+   ✅ テキスト処理と分析
+   ✅ 多言語対応
+   ✅ 文書生成と翻訳
+   ✅ 会話型インターフェース
+            """, language="python")
+
+        with st.expander("📋 実装例コード（OpenAI TTS使用例）", expanded=False):
             st.code(textwrap.dedent("""\
-        # Text to Speech API 使用例
+        # Text to Speech API 使用例（OpenAI）
+        from openai import OpenAI
+        
+        client = OpenAI()
         with client.audio.speech.with_streaming_response.create(
-            model=model, voice=voice, input=text
+            model="tts-1",
+            voice="nova",
+            input="こんにちは、テキスト読み上げのテストです。"
         ) as response:
-            response.stream_to_file(output_path)
+            response.stream_to_file("output.mp3")
+        
         # 保存したMP3を再生
-        st.audio(str(output_path), format="audio/mp3")
+        st.audio("output.mp3", format="audio/mp3")
             """), language="python")
+        
+        st.write("---")
+        st.subheader("📤 入力（デモンストレーション用）")
+        st.info("⚠️ このデモはAnthropic APIでは実行できません。OpenAI APIが必要です。")
 
         col1, col2 = st.columns([2, 1])
         with col1:
@@ -387,19 +438,58 @@ class SpeechToTextDemo(BaseDemo):
     @timer_ui
     def run(self):
         self.initialize()
+        
+        st.write("## 実装例: Speech to Text (STT)")
+        st.write("音声ファイルをテキストに変換します。")
+        
+        # Anthropic APIのメモ
+        with st.expander("📝 Anthropic API メモ", expanded=False):
+            st.code("""
+# Anthropic APIと音声認識について
 
-        with st.expander("Anthropic Audio API:実装例", expanded=False):
-            st.write("音声ファイルをテキストに変換するSTTデモ。")
+Anthropic Claude APIの音声認識状況：
+
+1. **現在の制限**
+   ❌ 音声ファイルの直接入力は未対応
+   ❌ リアルタイム音声処理は未対応
+
+2. **代替ソリューション**
+   音声認識が必要な場合：
+   - OpenAI Whisper API
+   - Google Cloud Speech-to-Text
+   - Amazon Transcribe
+   - Azure Speech Services
+   - IBM Watson Speech to Text
+
+3. **連携パターン**
+   1. 音声を他のAPIでテキスト化
+   2. テキストをClaude APIで処理
+   3. Claudeの強力な言語処理を活用
+
+4. **将来の展望**
+   Anthropicはマルチモーダル機能を
+   拡張中で、将来的に音声対応の
+   可能性があります。
+            """, language="python")
+
+        with st.expander("📋 実装例コード（OpenAI Whisper使用例）", expanded=False):
             st.code(textwrap.dedent("""\
-                # Speech to Text API 使用例
-                with open(audio_file, "rb") as f:
+                # Speech to Text API 使用例（OpenAI）
+                from openai import OpenAI
+                
+                client = OpenAI()
+                with open("audio.mp3", "rb") as f:
                     transcript = client.audio.transcriptions.create(
-                        model=model,
+                        model="whisper-1",
                         file=f,
                         response_format="text",
                     )
                 st.write(transcript)
             """), language="python")
+        
+        st.write("---")
+        st.subheader("📤 入力（デモンストレーション用）")
+        st.info("⚠️ このデモはAnthropic APIでは実行できません。OpenAI APIが必要です。")
 
         audio_files = self._get_audio_files()
         if not audio_files:
@@ -489,19 +579,80 @@ class SpeechTranslationDemo(BaseDemo):
     @timer_ui
     def run(self):
         self.initialize()
+        
+        st.write("## 実装例: 音声翻訳 (Speech Translation)")
+        st.write("音声ファイルを英語テキストに翻訳します。")
+        
+        # Anthropic APIのメモ
+        with st.expander("📝 Anthropic API メモ", expanded=False):
+            st.code("""
+# Anthropic APIと音声翻訳について
 
-        with st.expander("Anthropic Audio API:実装例", expanded=False):
-            st.write("音声ファイルを英語テキストに翻訳。英訳されない場合はChatで英訳フォールバック。")
+Anthropic Claude APIでの音声翻訳アプローチ：
+
+1. **直接音声翻訳は未対応**
+   ❌ 音声ファイルの直接入力不可
+   ❌ 音声から翻訳の直接処理不可
+
+2. **推奨ワークフロー**
+   1. OpenAI Whisperで音声認識
+   2. Claude APIで高品質翻訳
+   3. 文脈を理解した自然な翻訳
+
+3. **Claudeの翻訳の強み**
+   ✅ 文脈を考慮した高精度翻訳
+   ✅ 専門用語の正確な翻訳
+   ✅ ニュアンスの保持
+   ✅ 多言語対応（100+言語）
+
+4. **実装パターン**
+   ```python
+   # 1. 音声をテキスト化
+   transcript = whisper_api.transcribe(audio)
+   
+   # 2. Claudeで翻訳
+   response = claude.messages.create(
+       messages=[{
+           "role": "user",
+           "content": f"Translate to English: {transcript}"
+       }]
+   )
+   ```
+            """, language="python")
+
+        with st.expander("📋 実装例コード（OpenAI + Claude連携）", expanded=False):
             st.code(textwrap.dedent("""\
-                # Speech Translation API 使用例
-                with open(audio_file, "rb") as f:
-                    translation = client.audio.translations.create(
+                # Speech Translation ワークフロー例
+                from openai import OpenAI
+                from anthropic import Anthropic
+                
+                # 1. OpenAIで音声認識
+                openai_client = OpenAI()
+                with open("audio.mp3", "rb") as f:
+                    transcript = openai_client.audio.transcriptions.create(
                         model="whisper-1",
                         file=f,
-                        response_format="text",
+                        response_format="text"
                     )
-                # 万一英語化されないときは Chat で英訳フォールバック
+                
+                # 2. Claudeで高品質翻訳
+                claude = Anthropic()
+                response = claude.messages.create(
+                    model="claude-3-opus-20240229",
+                    messages=[{
+                        "role": "user",
+                        "content": f"Translate the following to English naturally: {transcript}"
+                    }],
+                    max_tokens=1024
+                )
+                
+                translation = response.content[0].text
+                st.write(translation)
             """), language="python")
+        
+        st.write("---")
+        st.subheader("📤 入力（デモンストレーション用）")
+        st.info("⚠️ このデモは音声処理にOpenAI APIが必要です。翻訳にClaude APIを使用します。")
 
         audio_files = self._get_audio_files()
         if not audio_files:

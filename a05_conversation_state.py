@@ -1,6 +1,6 @@
 # streamlit run a05_conversation_state.py --server.port=8505
 # --------------------------------------------------
-# OpenAI 会話状態管理デモアプリケーション（統一化版）
+# Anthropic 会話状態管理デモアプリケーション（統一化版）
 # Streamlitを使用したインタラクティブなAPIテストツール
 # 統一化版: a10_00_responses_api.pyの構成・構造・ライブラリ・エラー処理の完全統一
 # --------------------------------------------------
@@ -20,18 +20,6 @@ import pandas as pd
 from pydantic import BaseModel, Field, ValidationError
 
 from anthropic import Anthropic
-from openai.types.responses import (
-    EasyInputMessageParam,
-    ResponseInputTextParam,
-    ResponseInputImageParam,
-    ResponseFormatTextJSONSchemaConfigParam,
-    ResponseTextConfigParam,
-    FileSearchToolParam,
-    WebSearchToolParam,
-    ComputerToolParam,
-    FunctionToolParam,
-    Response,
-)
 
 # プロジェクトディレクトリの設定
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -49,7 +37,6 @@ try:
     )
     from helper_api import (
         config, logger, TokenManager, AnthropicClient,
-        EasyInputMessageParam, ResponseInputTextParam,
         ConfigManager, MessageManager, sanitize_key,
         error_handler, timer, get_default_messages,
         ResponseProcessor, format_timestamp
@@ -131,7 +118,7 @@ class BaseDemo(ABC):
         
         # Anthropicクライアントの初期化
         try:
-            self.client = Anthropic()
+            self.client = AnthropicClient()
         except Exception as e:
             st.error(f"Anthropicクライアントの初期化に失敗しました: {e}")
             return
@@ -148,39 +135,75 @@ class StatefulConversationDemo(BaseDemo):
 
     def run_demo(self):
         """ステートフルな会話継続デモの実行"""
-        st.write("## 実装例: previous_response_idを使用した会話継続")
+        st.write("## 実装例: 会話履歴を使用した会話継続")
         st.write("前の会話コンテキストを保持したまま会話を継続する方法を示します。")
+        
+        # Anthropic APIのメモ
+        with st.expander("📝 Anthropic API メモ", expanded=False):
+            st.code("""
+# Anthropic APIでの会話継続について
+
+Anthropic APIには、OpenAI APIの previous_response_id に相当する
+直接的な機能はありません。
+
+代わりに、以下の方法で会話状態を管理します：
+
+1. **会話履歴の管理**
+   - メッセージ配列に過去の会話を含める
+   - アシスタントとユーザーの交互のやり取りを保持
+
+2. **実装パターン**
+   ```python
+   messages = [
+       {"role": "user", "content": "初回の質問"},
+       {"role": "assistant", "content": "初回の回答"},
+       {"role": "user", "content": "追加の質問"}
+   ]
+   response = client.messages.create(
+       model=model,
+       messages=messages,
+       max_tokens=1024
+   )
+   ```
+
+3. **メリット**
+   - 完全な会話コンテキストの制御
+   - 必要に応じて会話履歴を編集可能
+   - 複数ターンの会話を簡単に管理
+            """, language="python")
         
         # 実装例サンプル表示
         with st.expander("📋 実装例コード", expanded=False):
             st.code("""
 # ステートフルな会話継続の実装例
 from anthropic import Anthropic
-from openai.types.responses import EasyInputMessageParam, ResponseInputTextParam
 
-client = OpenAI()
+client = Anthropic()
 
 # 初回質問
-initial_response = client.responses.create(
+initial_response = client.messages.create(
     model=model,
-    input=[
-        EasyInputMessageParam(
-            role="user",
-            content=[
-                ResponseInputTextParam(
-                    type="input_text", 
-                    text="Anthropic APIの使い方を教えて"
-                )
-            ]
-        )
-    ]
+    messages=[
+        {"role": "user", "content": "Anthropic APIの使い方を教えて"}
+    ],
+    max_tokens=1024
 )
 
-# 会話の継続（previous_response_idを使用）
-follow_up_response = client.responses.create(
+# 会話履歴を保持
+conversation_history = [
+    {"role": "user", "content": "Anthropic APIの使い方を教えて"},
+    {"role": "assistant", "content": initial_response.content[0].text}
+]
+
+# 会話の継続（履歴を含めて送信）
+conversation_history.append(
+    {"role": "user", "content": "具体的なコード例も教えて"}
+)
+
+follow_up_response = client.messages.create(
     model=model,
-    input="具体的なコード例も教えて",
-    previous_response_id=initial_response.id
+    messages=conversation_history,
+    max_tokens=1024
 )
             """, language="python")
         
@@ -200,7 +223,7 @@ follow_up_response = client.responses.create(
                 self._process_initial_question(initial_question)
         
         # 追加質問（初回回答がある場合のみ表示）
-        if f"initial_response_{self.safe_key}" in st.session_state:
+        if f"conversation_history_{self.safe_key}" in st.session_state:
             st.write("---")
             follow_up = st.text_area(
                 "追加質問（前の会話を引き継ぎます）",
@@ -219,29 +242,27 @@ follow_up_response = client.responses.create(
     def _process_initial_question(self, question: str):
         """初回質問の処理"""
         try:
-            # デフォルトメッセージを取得
-            messages = get_default_messages()
-            messages.append(
-                EasyInputMessageParam(
-                    role="user",
-                    content=[
-                        ResponseInputTextParam(
-                            type="input_text",
-                            text=question
-                        )
-                    ]
-                )
-            )
+            messages = [
+                {"role": "user", "content": question}
+            ]
             
             with st.spinner("処理中..."):
-                response = self.client.responses.create(
+                response = self.client.client.messages.create(
                     model=self.model,
-                    input=messages
+                    messages=messages,
+                    max_tokens=1024
                 )
             
+            # 会話履歴を保存
+            conversation_history = [
+                {"role": "user", "content": question},
+                {"role": "assistant", "content": response.content[0].text}
+            ]
+            
             # セッション状態に保存
+            st.session_state[f"conversation_history_{self.safe_key}"] = conversation_history
             st.session_state[f"initial_response_{self.safe_key}"] = response
-            st.success(f"✅ Response ID: `{response.id}` を保存しました")
+            st.success(f"✅ 初回の質問を処理しました")
             st.rerun()
             
         except Exception as e:
@@ -252,18 +273,28 @@ follow_up_response = client.responses.create(
     def _process_follow_up_question(self, question: str):
         """追加質問の処理"""
         try:
-            initial_response = st.session_state[f"initial_response_{self.safe_key}"]
+            # 会話履歴を取得
+            conversation_history = st.session_state[f"conversation_history_{self.safe_key}"]
+            
+            # 新しい質問を追加
+            conversation_history.append({"role": "user", "content": question})
             
             with st.spinner("処理中（前の会話を引き継ぎ中）..."):
-                response = self.client.responses.create(
+                response = self.client.client.messages.create(
                     model=self.model,
-                    input=question,
-                    previous_response_id=initial_response.id
+                    messages=conversation_history,
+                    max_tokens=1024
                 )
             
+            # 会話履歴を更新
+            conversation_history.append(
+                {"role": "assistant", "content": response.content[0].text}
+            )
+            
             # セッション状態に保存
+            st.session_state[f"conversation_history_{self.safe_key}"] = conversation_history
             st.session_state[f"follow_up_response_{self.safe_key}"] = response
-            st.success(f"✅ 会話を継続しました - Response ID: `{response.id}`")
+            st.success(f"✅ 会話を継続しました")
             st.rerun()
             
         except Exception as e:
@@ -284,130 +315,193 @@ follow_up_response = client.responses.create(
             response = st.session_state[f"follow_up_response_{self.safe_key}"]
             st.subheader("🤖 追加質問への回答")
             ResponseProcessorUI.display_response(response)
+        
+        # 会話履歴の表示
+        if f"conversation_history_{self.safe_key}" in st.session_state:
+            with st.expander("💬 会話履歴", expanded=False):
+                history = st.session_state[f"conversation_history_{self.safe_key}"]
+                for msg in history:
+                    if msg["role"] == "user":
+                        st.markdown(f"👤 **ユーザー:** {msg['content']}")
+                    else:
+                        st.markdown(f"🤖 **アシスタント:** {msg['content']}")
 
 
-class WebSearchParseDemo(BaseDemo):
-    """Web検索と構造化パースデモ"""
+class ToolUseDemo(BaseDemo):
+    """ツール使用デモ"""
 
     def run_demo(self):
-        """Web検索と構造化パースデモの実行"""
-        st.write("## 実装例: Web検索と構造化パース")
-        st.write("Web検索を実行し、その結果を構造化されたフォーマット（JSON）にパースします。")
+        """ツール使用デモの実行"""
+        st.write("## 実装例: ツール使用と構造化出力")
+        st.write("Anthropic APIのツール使用機能を使って外部ツールを呼び出し、構造化された出力を生成します。")
+        
+        # Anthropic APIのメモ
+        with st.expander("📝 Anthropic API メモ", expanded=False):
+            st.code("""
+# Anthropic APIでのツール使用について
+
+OpenAI APIの Web検索ツール (web_search_preview) に相当する
+直接的な機能はAnthropicにはありません。
+
+代わりに、以下の方法でツール使用を実装します：
+
+1. **カスタムツールの定義**
+   ```python
+   tools = [{
+       "name": "get_weather",
+       "description": "Get the current weather",
+       "input_schema": {
+           "type": "object",
+           "properties": {
+               "location": {"type": "string"}
+           },
+           "required": ["location"]
+       }
+   }]
+   ```
+
+2. **ツール使用の実行**
+   ```python
+   response = client.messages.create(
+       model=model,
+       messages=messages,
+       tools=tools,
+       tool_choice="auto"
+   )
+   ```
+
+3. **構造化出力の解析**
+   - Pydanticモデルを使用した出力検証
+   - JSONスキーマによる構造化
+            """, language="python")
         
         # 実装例サンプル表示
         with st.expander("📋 実装例コード", expanded=False):
             st.code("""
-# Web検索と構造化パースの実装例
+# ツール使用の実装例
 from anthropic import Anthropic
-from openai.types.responses import WebSearchToolParam
 from pydantic import BaseModel, Field
 
-client = OpenAI()
+client = Anthropic()
 
-# Web検索の実行
-tool = {"type": "web_search_preview"}
-search_response = client.responses.create(
+# 天気取得ツールの定義
+weather_tool = {
+    "name": "get_weather",
+    "description": "Get current weather for a location",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "location": {
+                "type": "string",
+                "description": "City name"
+            }
+        },
+        "required": ["location"]
+    }
+}
+
+# ツール使用の実行
+response = client.messages.create(
     model=model,
-    input="最新のAnthropic APIの情報は？",
-    tools=[tool]
+    messages=[
+        {"role": "user", "content": "東京の今日の天気は？"}
+    ],
+    tools=[weather_tool],
+    tool_choice="auto",
+    max_tokens=1024
 )
 
-# 構造化パースのためのスキーマ定義
-class APIInfo(BaseModel):
-    title: str = Field(..., description="記事のタイトル")
-    url: str = Field(..., description="記事のURL")
+# 構造化データのためのPydanticモデル
+class WeatherInfo(BaseModel):
+    location: str = Field(..., description="場所")
+    temperature: float = Field(..., description="気温")
+    condition: str = Field(..., description="天候状態")
 
-# 構造化パース実行
-structured_response = client.responses.parse(
-    model="gpt-4.1",
-    input="上の回答をtitleとurlだけJSON で返して",
-    previous_response_id=search_response.id,
-    text_format=APIInfo
-)
+# レスポンスの解析と構造化
+if response.stop_reason == "tool_use":
+    for content in response.content:
+        if content.type == "tool_use":
+            # ツール呼び出しの処理
+            tool_input = content.input
+            # 実際のツール実行（API呼び出しなど）
+            weather_data = get_weather(tool_input["location"])
+            # 構造化データとして返す
+            weather_info = WeatherInfo(**weather_data)
             """, language="python")
         
         # 入力エリア
         st.subheader("📤 入力")
         
-        search_query = st.text_input(
-            "検索クエリ",
-            value="東京の明日の天気と明日のイベントを教えて。",
-            key=f"search_query_{self.safe_key}"
+        query = st.text_input(
+            "質問",
+            value="東京の明日の天気とイベント情報を教えて",
+            key=f"query_{self.safe_key}"
         )
         
-        if st.button("🔍 検索実行", key=f"search_submit_{self.safe_key}"):
-            if search_query:
-                self._execute_web_search(search_query)
-        
-        # 構造化パースボタン（検索結果がある場合のみ表示）
-        if f"search_response_{self.safe_key}" in st.session_state:
-            if st.button("🔄 構造化実行", key=f"parse_submit_{self.safe_key}"):
-                self._execute_structured_parse()
+        if st.button("🔧 ツール実行", key=f"tool_submit_{self.safe_key}"):
+            if query:
+                self._execute_tool_demo(query)
         
         # 結果表示
-        self._display_search_results()
+        self._display_tool_results()
     
-    def _execute_web_search(self, query: str):
-        """Web検索の実行"""
+    def _execute_tool_demo(self, query: str):
+        """ツールデモの実行"""
         try:
-            tool: WebSearchToolParam = {"type": "web_search_preview"}
+            # シンプルな情報取得ツールの定義
+            info_tool = {
+                "name": "get_info",
+                "description": "Get general information about a topic",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "topic": {
+                            "type": "string",
+                            "description": "The topic to get information about"
+                        }
+                    },
+                    "required": ["topic"]
+                }
+            }
             
-            with st.spinner("Web検索中..."):
-                response = self.client.responses.create(
+            messages = [
+                {"role": "user", "content": query}
+            ]
+            
+            with st.spinner("ツール実行中..."):
+                # tool_choiceを適切な形式に設定
+                response = self.client.client.messages.create(
                     model=self.model,
-                    input=query,
-                    tools=[tool]
+                    messages=messages,
+                    tools=[info_tool],
+                    max_tokens=1024
                 )
             
-            st.session_state[f"search_response_{self.safe_key}"] = response
-            st.success(f"✅ Web検索完了 - Response ID: `{response.id}`")
+            st.session_state[f"tool_response_{self.safe_key}"] = response
+            st.success(f"✅ ツール実行完了")
             st.rerun()
             
         except Exception as e:
-            st.error(f"Web検索エラー: {e}")
+            st.error(f"ツール実行エラー: {e}")
             if config.get("experimental.debug_mode", False):
                 st.exception(e)
     
-    def _execute_structured_parse(self):
-        """構造化パースの実行"""
-        try:
-            search_response = st.session_state[f"search_response_{self.safe_key}"]
-            
-            # スキーマ定義
-            class APIInfo(BaseModel):
-                title: str = Field(..., description="記事のタイトル")
-                url: str = Field(..., description="記事のURL")
-            
-            with st.spinner("構造化パース中..."):
-                structured_response = self.client.responses.parse(
-                    model="gpt-4.1",
-                    input="上の回答をtitleとurlだけJSON で返して",
-                    previous_response_id=search_response.id,
-                    text_format=APIInfo
-                )
-            
-            st.session_state[f"structured_response_{self.safe_key}"] = structured_response
-            st.success("✅ 構造化パース完了")
-            st.rerun()
-            
-        except Exception as e:
-            st.error(f"構造化パースエラー: {e}")
-            if config.get("experimental.debug_mode", False):
-                st.exception(e)
-    
-    def _display_search_results(self):
-        """検索結果の表示"""
-        # 検索結果
-        if f"search_response_{self.safe_key}" in st.session_state:
-            response = st.session_state[f"search_response_{self.safe_key}"]
-            st.subheader("🤖 検索結果")
+    def _display_tool_results(self):
+        """ツール結果の表示"""
+        if f"tool_response_{self.safe_key}" in st.session_state:
+            response = st.session_state[f"tool_response_{self.safe_key}"]
+            st.subheader("🤖 ツール実行結果")
             ResponseProcessorUI.display_response(response)
-        
-        # 構造化データ
-        if f"structured_response_{self.safe_key}" in st.session_state:
-            response = st.session_state[f"structured_response_{self.safe_key}"]
-            st.subheader("🤖 構造化データ")
-            ResponseProcessorUI.display_response(response)
+            
+            # ツール使用の詳細を表示
+            if response.stop_reason == "tool_use":
+                st.subheader("🔧 ツール使用詳細")
+                for content in response.content:
+                    if hasattr(content, 'type') and content.type == "tool_use":
+                        st.json({
+                            "tool_name": content.name,
+                            "tool_input": content.input
+                        })
 
 
 class FunctionCallingDemo(BaseDemo):
@@ -418,16 +512,52 @@ class FunctionCallingDemo(BaseDemo):
         st.write("## 実装例: Function Calling (天気API)")
         st.write("Function Callingを使用して外部APIと統合する方法を示します。")
         
+        # Anthropic APIのメモ
+        with st.expander("📝 Anthropic API メモ", expanded=False):
+            st.code("""
+# Anthropic APIでのFunction Callingについて
+
+Anthropic APIでは、OpenAIのFunction Callingと同様の機能を
+ツール使用機能として実装します。
+
+主な違い：
+1. "functions" ではなく "tools" を使用
+2. "function_call" ではなく "tool_choice" を使用
+3. レスポンスは tool_use タイプのコンテンツとして返される
+
+実装パターン：
+```python
+tools = [{
+    "name": "get_weather",
+    "description": "Get weather information",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "latitude": {"type": "number"},
+            "longitude": {"type": "number"}
+        },
+        "required": ["latitude", "longitude"]
+    }
+}]
+
+response = client.messages.create(
+    model=model,
+    messages=messages,
+    tools=tools,
+    tool_choice="auto"
+)
+```
+            """, language="python")
+        
         # 実装例サンプル表示
         with st.expander("📋 実装例コード", expanded=False):
             st.code("""
 # Function Callingの実装例
 from anthropic import Anthropic
-from openai.types.responses import FunctionToolParam
 from pydantic import BaseModel, Field
 import requests
 
-client = OpenAI()
+client = Anthropic()
 
 # パラメータスキーマの定義
 class WeatherParams(BaseModel):
@@ -440,21 +570,30 @@ def get_weather(latitude: float, longitude: float) -> dict:
     response = requests.get(url)
     return response.json()
 
-# Function toolの定義
+# ツール定義（Anthropic形式）
 weather_tool = {
-    "type": "function",
-    "name": "get_weather", 
+    "name": "get_weather",
     "description": "現在の天気情報を取得",
-    "parameters": WeatherParams.model_json_schema(),
-    "strict": True
+    "input_schema": WeatherParams.model_json_schema()
 }
 
 # Function Calling実行
-response = client.responses.create(
-    model="gpt-4.1",
-    input="東京の今日の天気は？",
-    tools=[weather_tool]
+response = client.messages.create(
+    model=model,
+    messages=[
+        {"role": "user", "content": "東京の今日の天気は？"}
+    ],
+    tools=[weather_tool],
+    tool_choice="auto",
+    max_tokens=1024
 )
+
+# ツール呼び出しの処理
+if response.stop_reason == "tool_use":
+    for content in response.content:
+        if content.type == "tool_use" and content.name == "get_weather":
+            # 実際の天気データ取得
+            weather_data = get_weather(**content.input)
             """, language="python")
         
         # 入力エリア
@@ -523,22 +662,24 @@ response = client.responses.create(
             
             # JSON Schema生成
             schema = WeatherParams.model_json_schema()
-            schema["additionalProperties"] = False
             
-            # FunctionToolParam構築
-            weather_tool: FunctionToolParam = {
-                "type": "function",
+            # ツール定義（Anthropic形式）
+            weather_tool = {
                 "name": "get_weather",
                 "description": get_weather.__doc__,
-                "parameters": schema,
-                "strict": True,
+                "input_schema": schema
             }
             
+            messages = [
+                {"role": "user", "content": query}
+            ]
+            
             with st.spinner("Function Calling 実行中..."):
-                response = self.client.responses.create(
-                    model="gpt-4.1",
-                    input=query,
-                    tools=[weather_tool]
+                response = self.client.client.messages.create(
+                    model=self.model,
+                    messages=messages,
+                    tools=[weather_tool],
+                    max_tokens=1024
                 )
             
             # 実際の天気データを取得
@@ -550,7 +691,7 @@ response = client.responses.create(
             st.session_state[f"weather_data_{self.safe_key}"] = weather_data
             st.session_state[f"selected_city_{self.safe_key}"] = selected_city
             
-            st.success(f"✅ Function Calling完了 - Response ID: `{response.id}`")
+            st.success(f"✅ Function Calling完了")
             st.rerun()
             
         except Exception as e:
@@ -568,6 +709,16 @@ response = client.responses.create(
             
             st.subheader(f"🤖 Function Call 結果 - {selected_city}")
             ResponseProcessorUI.display_response(response)
+            
+            # ツール使用の詳細
+            if response.stop_reason == "tool_use":
+                st.subheader("🔧 ツール呼び出し詳細")
+                for content in response.content:
+                    if hasattr(content, 'type') and content.type == "tool_use":
+                        st.json({
+                            "tool_name": content.name,
+                            "tool_input": content.input
+                        })
             
             # リアルタイム天気データ
             if weather_data and "error" not in weather_data:
@@ -594,7 +745,7 @@ class DemoManager:
     def __init__(self):
         self.demos = {
             "ステートフルな会話継続": StatefulConversationDemo,
-            "Web検索と構造化パース": WebSearchParseDemo,
+            "ツール使用と構造化出力": ToolUseDemo,
             "Function Calling (天気API)": FunctionCallingDemo,
         }
     

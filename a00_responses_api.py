@@ -245,8 +245,42 @@ class TextResponseDemo(BaseDemo):
     def run(self):
         """デモの実行（統一化版）"""
         self.initialize()
-        text_compatibility = """
-        ### 要点比較：
+        
+        # 実装例の説明セクション
+        st.write("## 実装例: Anthropic Messages API基本応答")
+        st.write("Anthropic Messages APIを使用した基本的なテキスト応答の実装方法を示します。")
+        
+        # APIメモセクション（a05のパターンを適用）
+        with st.expander("📝 Anthropic API メモ", expanded=False):
+            st.code("""
+# Anthropic Messages APIについて
+
+Anthropic APIの基本的な使い方：
+
+1. **メッセージ形式**
+   - role: "user" または "assistant"
+   - content: メッセージの内容
+   
+2. **API呼び出し**
+   ```python
+   response = client.messages.create(
+       model="claude-3-opus-20240229",
+       messages=[
+           {"role": "user", "content": "質問内容"}
+       ],
+       max_tokens=4096
+   )
+   ```
+   
+3. **システムプロンプト**
+   - systemパラメータで指定
+   - AIの振る舞いを制御
+            """, language="python")
+        
+        # API互換性情報（既存コンテンツを整理）
+        with st.expander("🔄 OpenAI APIとの互換性", expanded=False):
+            text_compatibility = """
+### 要点比較：
 
 | 目的 | OpenAI 側 | Anthropic ネイティブ | Anthropic の OpenAI SDK 互換（ベータ） |
 |---|---|---|---|
@@ -257,81 +291,86 @@ class TextResponseDemo(BaseDemo):
 | ストリーミング | 可（`stream=True`） | 可（`stream`） | 可 |
 | 備考 | Responses は状態管理や内蔵ツールを統合 | Claude はコンテンツブロック（`text`/`tool_use` など）で返す | **テスト用途向け**。本番はネイティブ `Messages API` 推奨 |
 
-        - 補足: 互換レイヤーは *Chat Completions 互換であり、Responses API のフル互換ではありません。
-        （`response_format` など一部フィールドはスキップ／無視されることがあります）。
-        """
-        with st.expander("OpenAI APIとAnthropic APIの互換性："):
-            st.write("""
-            資料： https://docs.anthropic.com/en/api/openai-sdk  \n
-            「Anthropicは、OpenAI SDKを使用してAnthropic APIをテストするための互換性レイヤーを提供します。 \n
-            コードを少し変更するだけで、Anthropicモデルの機能を迅速に評価できます。」  \n
-            だそうです。なので、  \n
-            OpenAI APIから、Anthropic APIへ移植が可能です。  \n
-            ・RAG: Anthropicには、EmbeddingのAPI、CloudのVector Storeがないので、 \n
-            　実現方法（Cloud版、Local版: Qdrantの利用で。）は、本リポジトリーの  \n
-            　https://github.com/nakashima2toshio/openai_rag_jp  \n
-            　を参照、参考にしてください。
-            """)
+- 補足: 互換レイヤーは *Chat Completions 互換であり、Responses API のフル互換ではありません。
+"""
             st.markdown(text_compatibility)
-        with st.expander("Anthropic API実装例", expanded=False):
-            st.write(
-                "Anthropic Messages APIの基本的なテキスト応答デモ。デフォルトメッセージ+ユーザー入力でOne-Shot応答を実行。 MessageParamでメッセージ構築し、ResponseProcessorUIで結果表示。")
-            st.code("""
-            messages = get_default_messages()
-            messages.append(
-                {"role": "user", "content": user_input}
-            )
-
-        # 統一されたAPI呼び出し（temperatureパラメータ対応）
-        response = self.call_api_unified(messages, temperature=temperature)
-        　┗ api_params = {
-            "messages": messages,
-            "model": model,
-            "system": system_prompt,
-            "max_tokens": 4096
-            }
-            self.client.messages.create(**params)
-        ResponseProcessorUI.display_response(response)
-        
-        # -------
-        self.call_api_unified
-            # API呼び出しパラメータの準備
-            ┗ 
-            api_params = {
-                "messages": messages,
-                "model": model,
-                "system": system_prompt,
-                "max_tokens": 4096
-            }
-
-            # create_message を使用（Anthropic API）
-            return self.client.create_message(**api_params)
+            st.info("""
+資料： https://docs.anthropic.com/en/api/openai-sdk  
+OpenAI APIから、Anthropic APIへ移植が可能です。
             """)
+        
+        # 実装例コード（a05のパターンで整理）
+        with st.expander("📋 実装例コード", expanded=False):
+            st.code("""
+# 基本的なテキスト応答の実装例
+from anthropic import Anthropic
 
+client = Anthropic()
+
+# メッセージの準備
+messages = [
+    {"role": "user", "content": "Anthropic APIの使い方を教えて"}
+]
+
+# API呼び出し
+response = client.messages.create(
+    model="claude-3-opus-20240229",
+    messages=messages,
+    system="You are a helpful assistant.",
+    max_tokens=4096,
+    temperature=0.3
+)
+
+# 応答の取得
+print(response.content[0].text)
+            """, language="python")
+        
+        # セパレーター
+        st.write("---")
+        
+        # 入力セクション（a05のパターンを適用）
+        st.subheader("📤 入力")
+        
         example_query = config.get("samples.prompts.responses_query",
                                    "Anthropic APIのmessages.createメソッドを説明しなさい。")
-        st.write(f"質問の例: {example_query}")
-
+        st.info(f"💡 質問の例: {example_query}")
+        
         with st.form(key=f"text_form_{self.safe_key}"):
             user_input = st.text_area(
                 "質問を入力してください:",
-                height=config.get("ui.text_area_height", 75)
+                value="",
+                height=config.get("ui.text_area_height", 75),
+                placeholder=example_query
             )
 
-            # 統一されたtemperatureコントロール
-            temperature = self.create_temperature_control(
-                default_temp=0.3,
-                help_text="低い値ほど一貫性のある回答"
-            )
+            # パラメータセクション
+            col1, col2 = st.columns([2, 1])
+            with col1:
+                # 統一されたtemperatureコントロール
+                temperature = self.create_temperature_control(
+                    default_temp=0.3,
+                    help_text="低い値ほど一貫性のある回答"
+                )
+            with col2:
+                max_tokens = st.number_input(
+                    "最大トークン数",
+                    min_value=100,
+                    max_value=8192,
+                    value=4096,
+                    step=100
+                )
 
-            submitted = st.form_submit_button("送信")
+            submitted = st.form_submit_button("🚀 送信", use_container_width=True)
 
         if submitted and user_input:
-            self._process_query(user_input, temperature)
-
+            self._process_query(user_input, temperature, max_tokens)
+        
+        # 結果表示セクション
+        self._display_results()
+        
         self.show_debug_info()
 
-    def _process_query(self, user_input: str, temperature: Optional[float]):
+    def _process_query(self, user_input: str, temperature: Optional[float], max_tokens: int = 4096):
         """クエリの処理（統一化版）"""
         # 実行回数を更新
         session_key = f"demo_state_{self.safe_key}"
@@ -348,10 +387,28 @@ class TextResponseDemo(BaseDemo):
         )
 
         with st.spinner("処理中..."):
-            response = self.call_api_unified(messages, temperature=temperature)
+            response = self.call_api_unified(messages, temperature=temperature, max_tokens=max_tokens)
 
-        st.success("応答を取得しました")
-        ResponseProcessorUI.display_response(response)
+        # セッション状態に保存
+        st.session_state[f"last_response_{self.safe_key}"] = response
+        st.session_state[f"last_query_{self.safe_key}"] = user_input
+        st.success("✅ 応答を取得しました")
+    
+    def _display_results(self):
+        """結果の表示（a05のパターンを適用）"""
+        if f"last_response_{self.safe_key}" in st.session_state:
+            st.write("---")
+            st.subheader("🤖 AIの回答")
+            
+            response = st.session_state[f"last_response_{self.safe_key}"]
+            query = st.session_state.get(f"last_query_{self.safe_key}", "")
+            
+            # 質問の表示
+            with st.expander("💬 質問内容", expanded=False):
+                st.markdown(f"> {query}")
+            
+            # 応答の表示
+            ResponseProcessorUI.display_response(response)
 
 
 # ==================================================
@@ -384,43 +441,94 @@ class MemoryResponseDemo(BaseDemo):
     def run(self):
         """デモの実行（改修版）"""
         self.initialize()
-        st.write(
-            "**連続会話デモ**\n"
-            "responses.create()で連続した会話を実現。各ステップで「プロンプト + 回答」の履歴を保持し、"
-            "新しい質問を追加して連続実行します。会話の流れと各ステップが視覚的に確認できます。"
-        )
-
-        with st.expander("Anthropic API実装例", expanded=False):
+        
+        # 実装例の説明セクション（a05パターンを適用）
+        st.write("## 実装例: 連続会話管理")
+        st.write("会話履歴を保持しながら連続した対話を実現します。各ステップで「プロンプト + 回答」の履歴を保持し、文脈を踏まえた応答を生成します。")
+        
+        # APIメモセクション（a05パターンを適用）
+        with st.expander("📝 Anthropic API メモ", expanded=False):
             st.code("""
-            # 1回目: 初回質問
-            messages = get_default_messages()
-            messages.append({"role": "user", "content": user_input_1})
-            response_1 = self.call_api_unified(messages, temperature=temperature)
-              ┗ api_params = {
-                "messages": messages,
-                "model": model,
-                "system": system_prompt,
-                "max_tokens": 4096
-                }
-                self.client.messages.create(**params)
-    
-            # 2回目以降: 履歴 + 新しい質問
-            messages.append({"role": "assistant", "content": response_1_text})
-            messages.append({"role": "user", "content": user_input_2})
-            response_2 = self.call_api_unified(messages, temperature=temperature)
-    
-            # 連続実行...
-            """)
+# Anthropic APIでの連続会話について
 
-        # 会話履歴の表示
-        self._display_conversation_history()
+会話履歴の管理方法：
 
-        # 新しい質問の入力フォーム
+1. **メッセージ履歴の構築**
+   - userとassistantの交互のメッセージを配列で管理
+   - 各ターンでメッセージを追加
+
+2. **実装パターン**
+   ```python
+   # 会話履歴
+   messages = [
+       {"role": "user", "content": "初回の質問"},
+       {"role": "assistant", "content": "初回の回答"},
+       {"role": "user", "content": "追加の質問"}
+   ]
+   
+   # API呼び出し（履歴を含めて送信）
+   response = client.messages.create(
+       model=model,
+       messages=messages,
+       max_tokens=1024
+   )
+   ```
+
+3. **メリット**
+   - 完全な会話コンテキストの制御
+   - 必要に応じて会話履歴を編集可能
+   - 複数ターンの会話を簡単に管理
+            """, language="python")
+
+        # 実装例コード（a05パターンで整理）
+        with st.expander("📋 実装例コード", expanded=False):
+            st.code("""
+# 連続会話の実装例
+from anthropic import Anthropic
+
+client = Anthropic()
+
+# 会話履歴の初期化
+conversation_history = []
+
+# 1回目: 初回質問
+conversation_history.append({"role": "user", "content": "Pythonとは何ですか？"})
+response_1 = client.messages.create(
+    model=model,
+    messages=conversation_history,
+    max_tokens=1024
+)
+conversation_history.append({"role": "assistant", "content": response_1.content[0].text})
+
+# 2回目: 追加質問（履歴を含めて送信）
+conversation_history.append({"role": "user", "content": "具体的な使用例を教えて"})
+response_2 = client.messages.create(
+    model=model,
+    messages=conversation_history,
+    max_tokens=1024
+)
+conversation_history.append({"role": "assistant", "content": response_2.content[0].text})
+            """, language="python")
+        
+        # セパレーター
+        st.write("---")
+        
+        # 会話履歴セクション
+        if self.conversation_steps:
+            st.subheader("💬 会話履歴")
+            self._display_conversation_history()
+            st.write("---")
+        
+        # 入力セクション
+        st.subheader("📤 新しい質問")
         self._create_input_form()
-
-        # 会話管理ボタン
-        self._create_conversation_controls()
-
+        
+        # 会話管理セクション
+        if self.conversation_steps:
+            st.write("---")
+            st.subheader("⚙️ 会話管理")
+            self._create_conversation_controls()
+        
         self.show_debug_info()
 
     def _display_conversation_history(self):
@@ -429,20 +537,18 @@ class MemoryResponseDemo(BaseDemo):
             st.info("💬 会話を開始してください。質問を入力すると会話履歴が表示されます。")
             return
 
-        st.subheader("📝 会話履歴")
-
         # 会話統計の表示
         col1, col2, col3 = st.columns(3)
         with col1:
-            st.metric("会話ステップ数", len(self.conversation_steps))
+            st.metric("🔢 会話ステップ数", len(self.conversation_steps))
         with col2:
             total_tokens = sum(step.get('total_tokens', 0) for step in self.conversation_steps)
-            st.metric("累計トークン数", f"{total_tokens:,}")
+            st.metric("📊 累計トークン数", f"{total_tokens:,}")
         with col3:
             if self.conversation_steps:
                 latest_step = self.conversation_steps[-1]
                 latest_time = latest_step.get('timestamp', 'N/A')
-                st.metric("最新質問時刻", latest_time[-8:] if len(latest_time) > 8 else latest_time)  # 時刻部分のみ表示
+                st.metric("🕐 最新質問時刻", latest_time[-8:] if len(latest_time) > 8 else latest_time)  # 時刻部分のみ表示
 
         # 各会話ステップの表示
         for i, step in enumerate(self.conversation_steps, 1):
@@ -483,15 +589,13 @@ class MemoryResponseDemo(BaseDemo):
                         st.write(f"{j + 1}. **{role}**: {content_preview}")
 
     def _create_input_form(self):
-        """入力フォームの作成（フォーム不使用版）"""
-        st.subheader("💭 新しい質問")
-
+        """入力フォームの作成（a05パターンを適用）"""
         # 現在の会話コンテキスト情報
         if self.conversation_steps:
             st.info(
                 f"ℹ️ 現在 {len(self.conversation_steps)} ステップの会話履歴があります。新しい質問はこの履歴を踏まえて回答されます。")
         else:
-            st.info("ℹ️ 最初の質問です。デフォルトプロンプトと共に送信されます。")
+            st.info("ℹ️ 最初の質問です。会話を開始してください。")
 
         # セッション状態でユーザー入力を管理
         input_key = f"user_input_{self.safe_key}"
@@ -503,16 +607,14 @@ class MemoryResponseDemo(BaseDemo):
         if temp_key not in st.session_state:
             st.session_state[temp_key] = 0.3
 
-        # 質問例の表示
+        # 質問例の表示（expanderに収納）
         example_questions = self._get_example_questions()
         if example_questions:
-            st.write("**質問例:** （クリックで入力欄に設定）")
-            
-            # ボタンを縦並びで全文表示
-            for i, question in enumerate(example_questions[:3]):
-                if st.button(f"📝 {question}", key=f"example_{i}_{self.safe_key}", use_container_width=True):
-                    st.session_state[input_key] = question
-                    st.rerun()
+            with st.expander("💡 質問例", expanded=False):
+                for i, question in enumerate(example_questions[:3]):
+                    if st.button(f"📝 {question}", key=f"example_{i}_{self.safe_key}", use_container_width=True):
+                        st.session_state[input_key] = question
+                        st.rerun()
 
         # 入力エリア（セッション状態と連動）
         user_input = st.text_area(
@@ -527,8 +629,8 @@ class MemoryResponseDemo(BaseDemo):
         # ユーザー入力の同期
         st.session_state[input_key] = user_input
 
-        # Temperature設定
-        col1, col2 = st.columns([2, 1])
+        # パラメータ設定セクション
+        col1, col2, col3 = st.columns([2, 1, 1])
         with col1:
             if not self.is_reasoning_model(self.model):
                 temperature = st.slider(
@@ -539,36 +641,36 @@ class MemoryResponseDemo(BaseDemo):
                 )
                 st.session_state[temp_key] = temperature
             else:
-                st.info("ℹ️ 推論系モデル（o1, o3, o4系）ではtemperatureパラメータは使用されません")
+                st.info("ℹ️ 推論系モデルではtemperatureパラメータは使用されません")
                 temperature = None
-
-        # ボタン群
+        
         with col2:
-            col2_1, col2_2, col2_3 = st.columns(3)
+            max_tokens = st.number_input(
+                "最大トークン数",
+                min_value=100,
+                max_value=8192,
+                value=4096,
+                step=100,
+                key=f"max_tokens_{self.safe_key}"
+            )
 
-            with col2_1:
-                submitted = st.button(
-                    "🚀 送信",
-                    key=f"submit_{self.safe_key}",
-                    use_container_width=True,
-                    type="primary"
-                )
+        # 送信ボタン
+        with col3:
+            st.write("")  # スペーサー
+            st.write("")  # スペーサー
+            submitted = st.button(
+                "🚀 送信",
+                key=f"submit_{self.safe_key}",
+                use_container_width=True,
+                type="primary"
+            )
 
-            with col2_2:
-                clear_clicked = st.button(
-                    "🔄 クリア",
-                    key=f"clear_{self.safe_key}",
-                    use_container_width=True
-                )
-
-            with col2_3:
-                st.write("")  # スペース調整
-
-        # ボタン処理
-        if clear_clicked:
+        # クリアボタン（別行に配置）
+        if st.button("🔄 入力をクリア", key=f"clear_{self.safe_key}"):
             st.session_state[input_key] = ""
             st.rerun()
 
+        # 送信処理
         if submitted and user_input.strip():
             self._process_conversation_step(user_input, temperature)
         elif submitted and not user_input.strip():

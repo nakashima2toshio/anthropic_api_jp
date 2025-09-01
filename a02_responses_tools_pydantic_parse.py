@@ -1,4 +1,4 @@
-#
+#　streamlit run a02_responses_tools_pydantic_parse.py --server.port=8502
 # pip install --upgrade openai
 # ---------------------------------------------------- 情報：
 # https://cookbook.openai.com/examples/structured_outputs_intro
@@ -141,6 +141,8 @@ class Operator(str, Enum):
     ne = "!="
     gt = ">"
     lt = "<"
+    gte = ">="
+    lte = "<="
 
 
 class Condition(BaseModel):
@@ -384,46 +386,137 @@ class BasicFunctionCallDemo(BaseDemo):
         # 情報パネルの設定
         self.setup_sidebar(model)
 
-        st.markdown("#### 基本的な function call の構造化出力例")
-        with st.expander("BasicFunctionCallDemo", expanded=False):
+        # 実装例の説明セクション（a05パターンを適用）
+        st.write("## 実装例: Function Calling基本実装")
+        st.write("複数のツール（天気取得、ニュース検索）を定義し、AIが自動的に必要なツールを選択・実行します。")
+        
+        # APIメモセクション（a05パターンを適用）
+        with st.expander("📝 Anthropic API メモ", expanded=False):
             st.code("""
-            class WeatherRequest(BaseModel):
-                city: str
-                date: str
-            
-            class NewsRequest(BaseModel):
-                topic: str
-                date: str
-    
-            # Anthropic API tools format
-            tools = create_anthropic_tools_from_models([
-                (WeatherRequest, "weather", "Get weather information for a city"),
-                (NewsRequest, "news", "Search for news on a specific topic")
-            ])
-            
-            response = self.client.create_message_with_tools(
-                        model=model,
-                        messages=messages,
-                        tools=tools,
-                        max_tokens=4096
-                    )""")
+# Anthropic APIでのFunction Calling（Tool Use）について
 
+Anthropic APIでは「Tool Use」という機能でFunction Callingを実現：
+
+1. **ツール定義の形式**
+   - name: ツール名
+   - description: ツールの説明
+   - input_schema: 入力パラメータのJSONスキーマ
+
+2. **API呼び出し**
+   ```python
+   response = client.messages.create(
+       model=model,
+       messages=messages,
+       tools=tools,  # ツール定義の配列
+       max_tokens=4096
+   )
+   ```
+
+3. **レスポンス処理**
+   - content.type == 'tool_use' でツール呼び出しを検出
+   - content.name でツール名を取得
+   - content.input でパラメータを取得
+            """, language="python")
+        
+        # 実装例コード（a05パターンで整理）
+        with st.expander("📋 実装例コード", expanded=False):
+            st.code("""
+# Function Callingの実装例
+from anthropic import Anthropic
+from pydantic import BaseModel
+
+# Pydanticモデル定義
+class WeatherRequest(BaseModel):
+    city: str
+    date: str
+
+class NewsRequest(BaseModel):
+    topic: str
+    date: str
+
+# ツール定義の作成
+tools = [
+    {
+        "name": "weather",
+        "description": "Get weather information for a city",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "city": {"type": "string"},
+                "date": {"type": "string"}
+            },
+            "required": ["city", "date"]
+        }
+    },
+    {
+        "name": "news",
+        "description": "Search for news on a specific topic",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "topic": {"type": "string"},
+                "date": {"type": "string"}
+            },
+            "required": ["topic", "date"]
+        }
+    }
+]
+
+# API呼び出し
+client = Anthropic()
+response = client.messages.create(
+    model="claude-3-opus-20240229",
+    messages=[{"role": "user", "content": "東京の明日の天気を教えて"}],
+    tools=tools,
+    max_tokens=4096
+)
+
+# ツール呼び出しの処理
+for content in response.content:
+    if content.type == 'tool_use':
+        tool_name = content.name
+        tool_input = content.input
+        print(f"Tool: {tool_name}, Input: {tool_input}")
+            """, language="python")
+        
+        # セパレーター
+        st.write("---")
+        
+        # 入力セクション（a05パターンを適用）
+        st.subheader("📤 入力")
+        
         example_query = "東京と大阪の明日の天気と、AIの最新ニュースを教えて"
-        # st.write(f"質問例: {example_query}")
+        st.info(f"💡 例: {example_query}")
 
         with st.form(key=f"basic_function_form_{self.safe_key}"):
             user_input = st.text_area(
                 "質問を入力してください:",
-                value=example_query,
-                height=config.get("ui.text_area_height", 100)
+                value="",
+                height=config.get("ui.text_area_height", 100),
+                placeholder=example_query
             )
-            submitted = st.form_submit_button("送信")
+            
+            # パラメータセクション
+            col1, col2 = st.columns([2, 1])
+            with col2:
+                max_tokens = st.number_input(
+                    "最大トークン数",
+                    min_value=100,
+                    max_value=8192,
+                    value=4096,
+                    step=100
+                )
+            
+            submitted = st.form_submit_button("🚀 送信", use_container_width=True)
 
         if submitted and user_input:
-            self._process_query(model, user_input)
+            self._process_query(model, user_input, max_tokens)
+        
+        # 結果表示セクション
+        self._display_results()
 
     @timer
-    def _process_query(self, model: str, user_input: str):
+    def _process_query(self, model: str, user_input: str, max_tokens: int = 4096):
         """クエリの処理"""
         try:
             UIHelper.show_token_info(user_input, model, position="sidebar")
@@ -447,20 +540,44 @@ class BasicFunctionCallDemo(BaseDemo):
                     model=model,
                     messages=messages,
                     tools=tools,
-                    max_tokens=4096
+                    max_tokens=max_tokens
                 )
 
-            st.success("応答を取得しました")
-
+            # セッション状態に保存
+            st.session_state[f"last_response_{self.safe_key}"] = response
+            st.session_state[f"last_query_{self.safe_key}"] = user_input
+            
             # Function callsの処理
             parsed_calls = parse_anthropic_tool_use(response, model_mapping)
             if parsed_calls:
-                self._handle_function_calls(parsed_calls)
-
-            ResponseProcessorUI.display_response(response)
+                st.session_state[f"last_function_calls_{self.safe_key}"] = parsed_calls
+                
+            st.success("✅ 応答を取得しました")
 
         except Exception as e:
             self.handle_error(e)
+    
+    def _display_results(self):
+        """結果の表示（a05パターンを適用）"""
+        if f"last_response_{self.safe_key}" in st.session_state:
+            st.write("---")
+            st.subheader("🤖 実行結果")
+            
+            response = st.session_state[f"last_response_{self.safe_key}"]
+            query = st.session_state.get(f"last_query_{self.safe_key}", "")
+            parsed_calls = st.session_state.get(f"last_function_calls_{self.safe_key}", [])
+            
+            # 質問の表示
+            with st.expander("💬 質問内容", expanded=False):
+                st.markdown(f"> {query}")
+            
+            # Function callsの表示
+            if parsed_calls:
+                with st.expander("🔧 実行されたツール", expanded=True):
+                    self._handle_function_calls(parsed_calls)
+            
+            # レスポンスの表示
+            ResponseProcessorUI.display_response(response)
 
     def _handle_function_calls(self, parsed_calls):
         """Function callsの処理 (Anthropic version)"""

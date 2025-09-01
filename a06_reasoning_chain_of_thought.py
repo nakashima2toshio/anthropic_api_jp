@@ -19,17 +19,6 @@ import pandas as pd
 from pydantic import BaseModel, Field, ValidationError
 
 from anthropic import Anthropic
-from openai.types.responses import (
-    EasyInputMessageParam,
-    ResponseInputTextParam,
-    ResponseInputImageParam,
-    ResponseFormatTextJSONSchemaConfigParam,
-    ResponseTextConfigParam,
-    FileSearchToolParam,
-    WebSearchToolParam,
-    ComputerToolParam,
-    Response,
-)
 
 # プロジェクトディレクトリの設定
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -47,7 +36,6 @@ try:
     )
     from helper_api import (
         config, logger, TokenManager, AnthropicClient,
-        EasyInputMessageParam, ResponseInputTextParam,
         ConfigManager, MessageManager, sanitize_key,
         error_handler, timer, get_default_messages,
         ResponseProcessor, format_timestamp
@@ -179,7 +167,7 @@ class BaseDemo(ABC):
         
         # Anthropicクライアントの初期化
         try:
-            self.client = Anthropic()
+            self.client = AnthropicClient()
         except Exception as e:
             st.error(f"Anthropicクライアントの初期化に失敗しました: {e}")
             return
@@ -204,9 +192,8 @@ class StepByStepReasoningDemo(BaseDemo):
             st.code("""
 # Step-by-Step 推論の実装例
 from anthropic import Anthropic
-from openai.types.responses import EasyInputMessageParam, ResponseInputTextParam
 
-client = OpenAI()
+client = Anthropic()
 
 system_prompt = '''あなたは段階的に問題を解く methodical なチューターです。
 質問が与えられたら：
@@ -218,20 +205,14 @@ system_prompt = '''あなたは段階的に問題を解く methodical なチュ�
 
 推論において正確で論理的にしてください。'''
 
-messages = [
-    EasyInputMessageParam(role="system", content=system_prompt),
-    EasyInputMessageParam(
-        role="user",
-        content=[
-            ResponseInputTextParam(
-                type="input_text", 
-                text="2X + 1 = 5のとき、Xはいくつ？"
-            )
-        ]
-    )
-]
-
-response = client.responses.create(model=model, input=messages)
+response = client.messages.create(
+    model=model,
+    system=system_prompt,
+    messages=[
+        {"role": "user", "content": "2X + 1 = 5のとき、Xはいくつ？"}
+    ],
+    max_tokens=1024
+)
             """, language="python")
         
         # 入力エリア
@@ -264,23 +245,14 @@ response = client.responses.create(model=model, input=messages)
 
 推論において正確で論理的にしてください。"""
             
-            messages = [
-                EasyInputMessageParam(role="system", content=system_prompt),
-                EasyInputMessageParam(
-                    role="user",
-                    content=[
-                        ResponseInputTextParam(
-                            type="input_text",
-                            text=question
-                        )
-                    ]
-                )
-            ]
-            
             with st.spinner("段階的推論中..."):
-                response = self.client.responses.create(
+                response = self.client.client.messages.create(
                     model=self.model,
-                    input=messages
+                    system=system_prompt,
+                    messages=[
+                        {"role": "user", "content": question}
+                    ],
+                    max_tokens=1024
                 )
             
             # セッション状態に保存
@@ -314,9 +286,8 @@ class HypothesisTestDemo(BaseDemo):
             st.code("""
 # 仮説検証推論の実装例
 from anthropic import Anthropic
-from openai.types.responses import EasyInputMessageParam, ResponseInputTextParam
 
-client = OpenAI()
+client = Anthropic()
 
 system_prompt = '''あなたは仮説検証方法論に従う上級エンジニアです。
 問題と仮説が与えられたら：
@@ -331,20 +302,17 @@ system_prompt = '''あなたは仮説検証方法論に従う上級エンジニ�
 - Conclusion（理由付きで受諾/拒否）
 - Confidence Score（0-1）'''
 
-messages = [
-    EasyInputMessageParam(role="system", content=system_prompt),
-    EasyInputMessageParam(
-        role="user",
-        content=[
-            ResponseInputTextParam(
-                type="input_text", 
-                text="Problem: Webアプリの初回表示が3秒以上かかる\\nHypothesis: 画像ファイルのサイズが大きすぎて読み込み時間を圧迫している"
-            )
-        ]
-    )
-]
-
-response = client.responses.create(model=model, input=messages)
+response = client.messages.create(
+    model=model,
+    system=system_prompt,
+    messages=[
+        {
+            "role": "user", 
+            "content": "Problem: Webアプリの初回表示が3秒以上かかる\\nHypothesis: 画像ファイルのサイズが大きすぎて読み込み時間を圧迫している"
+        }
+    ],
+    max_tokens=1024
+)
             """, language="python")
         
         # 入力エリア
@@ -390,23 +358,14 @@ response = client.responses.create(model=model, input=messages)
             
             user_content = f"Problem: {problem}\nHypothesis: {hypothesis}"
             
-            messages = [
-                EasyInputMessageParam(role="system", content=system_prompt),
-                EasyInputMessageParam(
-                    role="user",
-                    content=[
-                        ResponseInputTextParam(
-                            type="input_text",
-                            text=user_content
-                        )
-                    ]
-                )
-            ]
-            
             with st.spinner("仮説検証中..."):
-                response = self.client.responses.create(
+                response = self.client.client.messages.create(
                     model=self.model,
-                    input=messages
+                    system=system_prompt,
+                    messages=[
+                        {"role": "user", "content": user_content}
+                    ],
+                    max_tokens=1024
                 )
             
             # セッション状態に保存
@@ -440,9 +399,8 @@ class TreeOfThoughtDemo(BaseDemo):
             st.code("""
 # Tree of Thought 推論の実装例
 from anthropic import Anthropic
-from openai.types.responses import EasyInputMessageParam, ResponseInputTextParam
 
-client = OpenAI()
+client = Anthropic()
 
 system_prompt = '''あなたはTree-of-Thoughts探索を実行するAIです。
 体系的な分岐推論で問題を解決します。
@@ -462,20 +420,17 @@ system_prompt = '''あなたはTree-of-Thoughts探索を実行するAIです。
 
 単なる線形思考ではなく、体系的な探索を使用してください。'''
 
-messages = [
-    EasyInputMessageParam(role="system", content=system_prompt),
-    EasyInputMessageParam(
-        role="user",
-        content=[
-            ResponseInputTextParam(
-                type="input_text", 
-                text="Goal: 4, 9, 10, 13 の数字を使って24を作る（四則演算のみ使用）"
-            )
-        ]
-    )
-]
-
-response = client.responses.create(model=model, input=messages)
+response = client.messages.create(
+    model=model,
+    system=system_prompt,
+    messages=[
+        {
+            "role": "user", 
+            "content": "Goal: 4, 9, 10, 13 の数字を使って24を作る（四則演算のみ使用）"
+        }
+    ],
+    max_tokens=1024
+)
             """, language="python")
         
         # 入力エリア
@@ -518,23 +473,14 @@ response = client.responses.create(model=model, input=messages)
             
             user_content = f"Goal: {goal}"
             
-            messages = [
-                EasyInputMessageParam(role="system", content=system_prompt),
-                EasyInputMessageParam(
-                    role="user",
-                    content=[
-                        ResponseInputTextParam(
-                            type="input_text",
-                            text=user_content
-                        )
-                    ]
-                )
-            ]
-            
             with st.spinner("Tree of Thought 探索中..."):
-                response = self.client.responses.create(
+                response = self.client.client.messages.create(
                     model=self.model,
-                    input=messages
+                    system=system_prompt,
+                    messages=[
+                        {"role": "user", "content": user_content}
+                    ],
+                    max_tokens=1024
                 )
             
             # セッション状態に保存
@@ -568,9 +514,8 @@ class ProsConsDecisionDemo(BaseDemo):
             st.code("""
 # Pros-Cons-Decision 推論の実装例
 from anthropic import Anthropic
-from openai.types.responses import EasyInputMessageParam, ResponseInputTextParam
 
-client = OpenAI()
+client = Anthropic()
 
 system_prompt = '''あなたはバランスの取れた意思決定支援アシスタントです。
 メリットとデメリットを体系的にリストアップしてトピックを分析し、理性的な決定を下します。
@@ -590,20 +535,17 @@ system_prompt = '''あなたはバランスの取れた意思決定支援アシ�
 - Rationale:（詳細な推論）
 - Confidence:（0-1スコア）'''
 
-messages = [
-    EasyInputMessageParam(role="system", content=system_prompt),
-    EasyInputMessageParam(
-        role="user",
-        content=[
-            ResponseInputTextParam(
-                type="input_text", 
-                text="Topic: リモートワークとオフィス出社、どちらを選ぶべきか？\\nPerspective: 一般的"
-            )
-        ]
-    )
-]
-
-response = client.responses.create(model=model, input=messages)
+response = client.messages.create(
+    model=model,
+    system=system_prompt,
+    messages=[
+        {
+            "role": "user", 
+            "content": "Topic: リモートワークとオフィス出社、どちらを選ぶべきか？\\nPerspective: 一般的"
+        }
+    ],
+    max_tokens=1024
+)
             """, language="python")
         
         # 入力エリア
@@ -655,23 +597,14 @@ response = client.responses.create(model=model, input=messages)
             
             user_content = f"Topic: {topic}\nPerspective: {perspective}"
             
-            messages = [
-                EasyInputMessageParam(role="system", content=system_prompt),
-                EasyInputMessageParam(
-                    role="user",
-                    content=[
-                        ResponseInputTextParam(
-                            type="input_text",
-                            text=user_content
-                        )
-                    ]
-                )
-            ]
-            
             with st.spinner("賛否比較決定中..."):
-                response = self.client.responses.create(
+                response = self.client.client.messages.create(
                     model=self.model,
-                    input=messages
+                    system=system_prompt,
+                    messages=[
+                        {"role": "user", "content": user_content}
+                    ],
+                    max_tokens=1024
                 )
             
             # セッション状態に保存
@@ -705,9 +638,8 @@ class PlanExecuteReflectDemo(BaseDemo):
             st.code("""
 # Plan-Execute-Reflect 推論の実装例
 from anthropic import Anthropic
-from openai.types.responses import EasyInputMessageParam, ResponseInputTextParam
 
-client = OpenAI()
+client = Anthropic()
 
 system_prompt = '''あなたはPlan-Execute-Reflect改善ループを実装するAIです。
 
@@ -728,20 +660,17 @@ system_prompt = '''あなたはPlan-Execute-Reflect改善ループを実装す�
 
 課題について現実的で、改善について具体的にしてください。'''
 
-messages = [
-    EasyInputMessageParam(role="system", content=system_prompt),
-    EasyInputMessageParam(
-        role="user",
-        content=[
-            ResponseInputTextParam(
-                type="input_text", 
-                text="Objective: 3週間以内にプログラミングスキルを向上させてWebアプリを完成させる\\nComplexity Level: 標準"
-            )
-        ]
-    )
-]
-
-response = client.responses.create(model=model, input=messages)
+response = client.messages.create(
+    model=model,
+    system=system_prompt,
+    messages=[
+        {
+            "role": "user", 
+            "content": "Objective: 3週間以内にプログラミングスキルを向上させてWebアプリを完成させる\\nComplexity Level: 標準"
+        }
+    ],
+    max_tokens=1024
+)
             """, language="python")
         
         # 入力エリア
@@ -793,23 +722,14 @@ response = client.responses.create(model=model, input=messages)
             
             user_content = f"Objective: {objective}\nComplexity Level: {complexity}"
             
-            messages = [
-                EasyInputMessageParam(role="system", content=system_prompt),
-                EasyInputMessageParam(
-                    role="user",
-                    content=[
-                        ResponseInputTextParam(
-                            type="input_text",
-                            text=user_content
-                        )
-                    ]
-                )
-            ]
-            
             with st.spinner("Plan-Execute-Reflect 実行中..."):
-                response = self.client.responses.create(
+                response = self.client.client.messages.create(
                     model=self.model,
-                    input=messages
+                    system=system_prompt,
+                    messages=[
+                        {"role": "user", "content": user_content}
+                    ],
+                    max_tokens=1024
                 )
             
             # セッション状態に保存
