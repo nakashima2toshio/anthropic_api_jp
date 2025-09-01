@@ -507,25 +507,12 @@ class MemoryResponseDemo(BaseDemo):
         example_questions = self._get_example_questions()
         if example_questions:
             st.write("**質問例:** （クリックで入力欄に設定）")
-            col1, col2, col3 = st.columns(3)
-
-            with col1:
-                if st.button(f"📝 {example_questions[0][:30]}...", key=f"example_0_{self.safe_key}",
-                             help=example_questions[0]):
-                    st.session_state[input_key] = example_questions[0]
+            
+            # ボタンを縦並びで全文表示
+            for i, question in enumerate(example_questions[:3]):
+                if st.button(f"📝 {question}", key=f"example_{i}_{self.safe_key}", use_container_width=True):
+                    st.session_state[input_key] = question
                     st.rerun()
-            with col2:
-                if len(example_questions) > 1:
-                    if st.button(f"📝 {example_questions[1][:30]}...", key=f"example_1_{self.safe_key}",
-                                 help=example_questions[1]):
-                        st.session_state[input_key] = example_questions[1]
-                        st.rerun()
-            with col3:
-                if len(example_questions) > 2:
-                    if st.button(f"📝 {example_questions[2][:30]}...", key=f"example_2_{self.safe_key}",
-                                 help=example_questions[2]):
-                        st.session_state[input_key] = example_questions[2]
-                        st.rerun()
 
         # 入力エリア（セッション状態と連動）
         user_input = st.text_area(
@@ -597,15 +584,14 @@ class MemoryResponseDemo(BaseDemo):
         if not self.conversation_steps:
             # 初回質問の例
             return [
-                "Python でウェブスクレイピングの基本的な方法を教えてください",
-                "機械学習の教師あり学習について説明してください",
-                "REST APIとは何か、基本的な概念を教えてください"
+                "Anthropic APIで、messages.createの使い方を説明したください",
+                "Anthropic APIの音声、翻訳処理と画像処理関連について説明してください。",
+                "Anthropic APIとOpenAI APIとの互換性について対比して説明してください。"
             ]
         else:
             # 継続質問の例
             return [
-                "もう少し詳しく説明してください",
-                "具体的なコード例を示してください",
+                "もう少し具体的なコードで対比して詳しく説明してください",
                 "関連する技術やライブラリも教えてください",
                 "実際のプロジェクトではどのように活用しますか？",
                 "これの注意点やベストプラクティスはありますか？"

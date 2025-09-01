@@ -8,6 +8,7 @@ import os
 import sys
 import json
 import logging
+import re
 from datetime import datetime
 import time
 from abc import ABC, abstractmethod
@@ -18,18 +19,7 @@ import streamlit as st
 import pandas as pd
 from pydantic import BaseModel, Field, ValidationError
 
-from openai import OpenAI
-from openai.types.responses import (
-    EasyInputMessageParam,
-    ResponseInputTextParam,
-    ResponseInputImageParam,
-    ResponseFormatTextJSONSchemaConfigParam,
-    ResponseTextConfigParam,
-    FileSearchToolParam,
-    WebSearchToolParam,
-    ComputerToolParam,
-    Response,
-)
+from anthropic import Anthropic
 
 # プロジェクトディレクトリの設定
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -46,8 +36,7 @@ try:
         InfoPanelManager, safe_streamlit_json
     )
     from helper_api import (
-        config, logger, TokenManager, OpenAIClient,
-        EasyInputMessageParam, ResponseInputTextParam,
+        config, logger, TokenManager, AnthropicClient,
         ConfigManager, MessageManager, sanitize_key,
         error_handler, timer, get_default_messages,
         ResponseProcessor, format_timestamp
@@ -63,7 +52,7 @@ def setup_page_config():
     """ページ設定（重複実行エラー回避）"""
     try:
         st.set_page_config(
-            page_title=config.get("ui.page_title", "OpenAI Structured Outputs Parse Schema デモ"),
+            page_title=config.get("ui.page_title", "Anthropic Structured Outputs Parse Schema デモ"),
             page_icon=config.get("ui.page_icon", "🗂️"),
             layout=config.get("ui.layout", "wide"),
             initial_sidebar_state="expanded"
@@ -116,11 +105,11 @@ class BaseDemo(ABC):
         self.demo_name = demo_name
         self.config = ConfigManager("config.yml")
 
-        # OpenAIクライアントの初期化（統一されたエラーハンドリング）
+        # Anthropicクライアントの初期化（統一されたエラーハンドリング）
         try:
-            self.client = OpenAIClient()
+            self.client = AnthropicClient()
         except Exception as e:
-            st.error(f"OpenAIクライアントの初期化に失敗しました: {e}")
+            st.error(f"Anthropicクライアントの初期化に失敗しました: {e}")
             st.stop()
 
         self.safe_key = sanitize_key(demo_name)
@@ -207,15 +196,31 @@ class BaseDemo(ABC):
 
     @error_handler_ui
     @timer_ui
-    def call_api_parse(self, input_text: str, text_format: BaseModel, temperature: Optional[float] = None, **kwargs):
-        """統一されたresponses.parse API呼び出し（temperatureパラメータ対応）"""
+    def call_api_parse(self, input_text: str, text_format: type, temperature: Optional[float] = None, **kwargs):
+        """統一されたAnthropic API呼び出し（Pydantic構造化出力対応）"""
         model = self.get_model()
+        
+        # Pydanticスキーマの説明を取得
+        schema_description = self._get_schema_description(text_format)
+        
+        # 構造化出力のためのプロンプト作成
+        structured_prompt = f"""{input_text}
+
+Please respond with a JSON that matches the following schema:
+{schema_description}
+
+IMPORTANT: Return ONLY valid JSON without any additional text or formatting."""
+
+        # メッセージの作成
+        messages = [
+            {"role": "user", "content": structured_prompt}
+        ]
 
         # API呼び出しパラメータの準備
         api_params = {
-            "input": input_text,
+            "messages": messages,
             "model": model,
-            "text_format": text_format
+            "max_tokens": 4096
         }
 
         # temperatureサポートチェック（reasoning系モデルは除外）
@@ -225,9 +230,68 @@ class BaseDemo(ABC):
         # その他のパラメータ
         api_params.update(kwargs)
 
-        # responses.parse を使用（統一されたAPI呼び出し）
-        anthropic_client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-        return anthropic_client.messages.create(**api_params)
+        try:
+            # Anthropic Messages API を使用
+            response = self.client.create_message(**api_params)
+            
+            # JSON解析とPydanticオブジェクト生成
+            return self._parse_response_to_pydantic(response, text_format)
+        except Exception as e:
+            logger.error(f"API call failed: {e}")
+            # エラー時でもレスポンスを返すために、エラー情報を含むダミーレスポンスを作成
+            error_response = type('Response', (), {
+                'content': [type('Content', (), {'text': f"Error: {str(e)}"})()],
+                'output_parsed': None,
+                'usage': None
+            })()
+            raise
+    
+    def _get_schema_description(self, model_class: type) -> str:
+        """Pydanticモデルからスキーマ説明を生成"""
+        try:
+            schema = model_class.model_json_schema()
+            return json.dumps(schema, indent=2, ensure_ascii=False)
+        except Exception:
+            # フォールバック: 基本的な説明
+            return f"A JSON object matching the {model_class.__name__} schema"
+    
+    def _parse_response_to_pydantic(self, response, model_class: type):
+        """レスポンスをPydanticオブジェクトに変換"""
+        # レスポンステキストの抽出
+        response_text = self._extract_response_text(response)
+        
+        # JSON解析
+        try:
+            # JSONの抽出（```json ブロックがある場合の対応）
+            json_match = re.search(r'```(?:json)?\s*({.*?})\s*```', response_text, re.DOTALL)
+            if json_match:
+                json_str = json_match.group(1)
+            else:
+                # 直接JSON形式の場合
+                json_str = response_text.strip()
+            
+            # JSON解析
+            parsed_data = json.loads(json_str)
+            
+            # Pydanticオブジェクト生成
+            parsed_obj = model_class(**parsed_data)
+            
+            # レスポンスオブジェクトに追加
+            response.output_parsed = parsed_obj
+            return response
+            
+        except (json.JSONDecodeError, ValidationError) as e:
+            logger.error(f"JSON parsing error: {e}")
+            logger.error(f"Response text: {response_text}")
+            raise
+    
+    def _extract_response_text(self, response) -> str:
+        """Anthropicレスポンスからテキストを抽出"""
+        if hasattr(response, 'content') and response.content:
+            for content in response.content:
+                if hasattr(content, 'text'):
+                    return content.text
+        return str(response)
 
     @abstractmethod
     def run(self):
@@ -353,7 +417,7 @@ class EventExtractionDemo(BaseDemo):
 
         # デフォルトテキスト
         default_text = config.get("samples.prompts.event_example",
-                                 "台湾フェス2025 ～あつまれ！究極の台湾グルメ～ 開催日：5/3・5/4 参加者：王さん、林さん、佐藤さん")
+                                 "台湾フェス2025 ～あつまれ！究極の台湾グルメ～ 開催日：5/3・5/4 参加者：森本さん、Lennonさん、佐藤さん")
 
         st.write(f"**質問例**: {default_text}")
 

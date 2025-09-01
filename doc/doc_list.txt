@@ -1,7 +1,18 @@
 Memo
-python -m pip install -r requirements.txt
+以下のクラスをopenai APIの環境から、anthropic API,anthropic APIの環境に移植しなさい。
 
-[サンプルプログラム]
+SimpleDataExtractionDemo("SimpleDataExtraction"),
+NestedStructureDemo("NestedStructure"),
+EnumTypeDemo("EnumType"),
+NaturalTextStructuredOutputDemo("NaturalTextStructured"),
+MultipleEntityExtractionDemo("MultipleEntityExtraction"),
+ComplexQueryDemo("ComplexQuery"),
+DynamicEnumDemo("DynamicEnum"),
+ChainOfThoughtDemo("ChainOfThought"),
+ConversationHistoryDemo("ConversationHistory"),
+
+
+python -m pip install -r requirements.txt
 
 a*.py のコードを改修したい。
 a00_responses_api.py は、openai_a00_responses_api.py を参考として
@@ -11,25 +22,6 @@ a03_images_and_vision.py　は、openai_a03_images_and_vision.py を参考とし
 a04_audio_speeches.py　は、openai_a04_audio_speeches.py を参考として
 a05_conversation_state.py　は、openai_a05_conversation_state.py を参考として
 a06_reasoning_chain_of_thought.py　は、openai_a06_reasoning_chain_of_thought.py を参考として
-
-改修内容は、
-左ペインの表示順番、表示項目、表示内容
-右ペインの表示順番、表示項目、表示内容　をそれぞれ、openai*.py を参考に、改修せよ。
-
-a*.py は、anthropic APIの利用例である。
-a*.py は、anthropic APIの利用例として改修せよ。
-
-ここで、
-openai*.py は、openai APIの利用例である。
-
-
-
-
-
-
-
-
-
 
 
 [ヘルパー関数]
