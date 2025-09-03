@@ -4,8 +4,8 @@
 - (1) Macbook M2 - 24Gメモリ
 - (2) 開発環境 - PyCharm professional
               - Github
-- (3) AI - Anthropic - claude code, Anthropic API, Anthropic Claude for Macbook
-- (4) AI - OpenAI API, ChatGPT-5 pro
+- (3) AI - Anthropic - Claude Code, Anthropic API, Claude for Macbook  
+- (4) AI - OpenAI API, ChatGPT Pro（参考比較用）
 
 
 #### (1) Pay for Anthropic API key
@@ -36,15 +36,15 @@ echo "$ANTHROPIC_API_KEY"
 
 ```bash
 # 1. リポジトリクローン
-git clone https://github.com/nakashima2toshio/openai_api_app.git
-cd openai_api_app
+git clone https://github.com/nakashima2toshio/anthropic_api_jp.git
+cd anthropic_api_jp
 
 # 2. 依存関係インストール
 pip install -r requirements.txt
 
 # 3. 環境変数設定
-export OPENAI_API_KEY='your-api-key'
+export ANTHROPIC_API_KEY='your-api-key'
 
 # 4. 実行
-streamlit run a10_00_responses_api.py
+streamlit run a00_responses_api.py
 ```

@@ -1,10 +1,10 @@
-# OpenAI API サンプルプログラム一覧
+# Anthropic Claude API サンプルプログラム一覧
 
-Preparation(準備）：[README_premaration.md](./README_preparation.md)
+Preparation(準備）：[README_preparation.md](./README_preparation.md)
 
 ## 概要
 
-・OpenAI APIの学習用サンプルプログラム集の機能一覧です。
+・Anthropic Claude APIの学習用サンプルプログラム集の機能一覧です。
 ・各プログラムは異なるAPIの側面と機能を実際に体験できるよう設計されており、
 　基本的な使用法から高度な応用まで段階的に学習できます。
 
@@ -12,22 +12,18 @@ Preparation(準備）：[README_premaration.md](./README_preparation.md)
 
 ## a00_responses_api.py
 
-**OpenAI Responses API 統合デモ**
+**Anthropic Claude API 基本デモ**
 
 
 | 機能名                    | 概要                                                                                |
 | ------------------------- | ----------------------------------------------------------------------------------- |
-| Text Responses (One Shot) | 基本的なテキスト応答デモ。デフォルトメッセージ+ユーザー入力でワンショット応答を実行 |
-| Text Responses (Memory)   | 連続会話対応デモ。`previous_response_id`を使った会話状態の継続と履歴管理            |
+| Text Responses (One Shot) | 基本的なテキスト応答デモ。システムプロンプト+ユーザー入力でワンショット応答を実行 |
+| Text Responses (Memory)   | 連続会話対応デモ。MessageManagerによる会話状態の継続と履歴管理            |
 | Image to Text (URL)       | 画像URL入力からテキスト生成。マルチモーダル対応のビジョン機能デモ                   |
 | Image to Text (Base64)    | ローカル画像ファイル（Base64）からテキスト生成。画像アップロード対応                |
-| Structured Output         | 構造化出力デモ。イベント情報の抽出とPydanticモデルによる型安全な出力                |
-| Open Weather API          | 外部API連携デモ。OpenWeatherMap APIを使用したリアルタイム天気情報取得               |
-| File Search-Tool          | Vector Store検索デモ。ファイル検索ツールによるRAG（検索拡張生成）実装               |
-| Web Search Tools          | Web検索ツール専用デモ。地域設定対応のリアルタイムWeb検索機能                        |
-| Computer Use Tool         | Computer Use APIデモ。AI によるコンピューター操作の自動化（実験的機能）             |
+| Structured Output         | 構造化出力デモ。イベント情報の抽出とPydanticモデルによる型安全な出力（※プレースホルダー）                |
 
-**主要API**: `responses.create`, Vector Stores API, OpenWeatherMap API, Web Search Tool, Computer Use Tool
+**主要API**: `messages.create`, Anthropic Claude API
 
 ---
 
@@ -45,13 +41,13 @@ Preparation(準備）：[README_premaration.md](./README_preparation.md)
 | 条件分岐スキーマ         | ユーザー情報または住所情報を判別して適切なスキーマで構造化       |
 | モデレーション＆拒否処理 | 不適切コンテンツの検出と拒否理由の構造化された出力               |
 
-**主要API**: `responses.parse`, Pydantic モデル
+**主要API**: Anthropic Claude API（構造化出力）, Pydantic モデル
 
 ---
 
 ## a02_responses_tools_pydantic_parse.py
 
-**Pydantic Parse 高度デモ**
+**Tool Use/Function Calling デモ**
 
 
 | 機能名                | 概要                                                 |
@@ -67,7 +63,7 @@ Preparation(準備）：[README_premaration.md](./README_preparation.md)
 | 思考の連鎖(CoT)       | Chain of Thought思考プロセスの実装と可視化           |
 | 会話履歴              | 連続対話での文脈保持と構造化された質疑応答管理       |
 
-**主要API**: `responses.parse`, `pydantic_function_tool`, OpenWeatherMap API
+**主要API**: Tool Use API, Pydantic モデル, OpenWeatherMap API
 
 ---
 
@@ -78,28 +74,23 @@ Preparation(準備）：[README_premaration.md](./README_preparation.md)
 
 | 機能名                             | 概要                                                   |
 | ---------------------------------- | ------------------------------------------------------ |
-| 入力画像(URL) → テキスト生成      | 画像URLを入力として画像内容をテキストで詳細説明生成    |
-| 入力画像データ(Base64) → テキスト | ローカル画像ファイルをBase64エンコードしてテキスト生成 |
-| プロンプト → 画像生成 (DALL-E)    | テキストプロンプトからDALL-E 3/2を使用した画像生成     |
+| 入力画像(URL) → テキスト生成      | 画像URLを入力として画像内容をテキストで詳細説明生成（Vision API）    |
+| 入力画像データ(Base64) → テキスト | ローカル画像ファイルをBase64エンコードしてテキスト生成（Vision API） |
 
-**主要API**: `responses.create`, `images.generate`, DALL-E 3/2
+**主要API**: Claude Vision API (`messages.create` with images)
 
 ---
 
 ## a04_audio_speeches.py
 
-**音声処理API統合**
+**音声処理統合パターンデモ**
 
 
 | 機能名              | 概要                                                             |
 | ------------------- | ---------------------------------------------------------------- |
-| Text to Speech      | テキストを音声に変換するTTSデモ。ストリーミング対応MP3出力       |
-| Speech to Text      | 音声ファイルをテキストに変換するSTTデモ。Whisperモデル使用       |
-| Speech Translation  | 音声ファイルを英語テキストに翻訳。英訳フォールバック機能付き     |
-| Realtime API        | リアルタイム音声対話デモ。マイク入力とスピーカー出力の双方向通信 |
-| Chained Voice Agent | 音声→テキスト→Chat→音声の連鎖処理による音声エージェント       |
+| Audio Pattern Demo  | Claude APIと音声処理の統合パターンを示すデモ（※プレースホルダー実装） |
 
-**主要API**: `audio.speech.create`, `audio.transcriptions.create`, `audio.translations.create`, Realtime API
+**主要API**: Anthropic Claude API（音声処理は外部サービス連携パターン）
 
 ---
 
@@ -109,11 +100,11 @@ Preparation(準備）：[README_premaration.md](./README_preparation.md)
 
 | 機能名                 | 概要                                                     |
 | ---------------------- | -------------------------------------------------------- |
-| ステートフルな会話継続 | `previous_response_id`を使用した前の会話コンテキスト保持 |
-| Web検索と構造化パース  | Web検索実行後の結果をJSON形式に構造化パース              |
-| Function Calling       | OpenWeatherMap APIを使用した天気情報取得の関数呼び出し   |
+| ステートフルな会話継続 | MessageManagerを使用した前の会話コンテキスト保持 |
+| Tool Use実装  | Tool Useを使用した外部API連携パターン              |
+| Function Calling       | OpenWeatherMap APIを使用した天気情報取得のツール呼び出し   |
 
-**主要API**: `responses.create`, `responses.parse`, Web Search Tool, Open-Meteo API
+**主要API**: `messages.create`, Tool Use API, OpenWeatherMap API
 
 ---
 
@@ -129,7 +120,7 @@ Preparation(準備）：[README_premaration.md](./README_preparation.md)
 | Pros-Cons-Decision（賛否比較型）   | メリット・デメリットを比較して合理的決定。技術選定に有効       |
 | Plan-Execute-Reflect（反復改良型） | 計画・実行・振り返りのループで継続改善。プロジェクト管理に使用 |
 
-**主要API**: `responses.create`, 推論系モデル対応
+**主要API**: `messages.create`, Claude 3.5/4 推論モデル
 
 ---
 
@@ -138,7 +129,7 @@ Preparation(準備）：[README_premaration.md](./README_preparation.md)
 
 | ファイル名    | 概要                                                                                         | 利用API / 機能        |
 | ------------- | -------------------------------------------------------------------------------------------- | --------------------- |
-| helper_api.py | OpenAI Python SDK 呼び出しや共通ユーティリティの集約（クライアント初期化・共通呼び出し等）。 | **OpenAI Python SDK** |
+| helper_api.py | Anthropic Python SDK 呼び出しや共通ユーティリティの集約（クライアント初期化・共通呼び出し等）。 | **Anthropic Python SDK** |
 | helper_st.py  | Streamlit UI 用の共通部品（レイアウト/入力/表示まわりのヘルパー）。                          | **Streamlit**         |
 
 ---
@@ -169,32 +160,32 @@ Preparation(準備）：[README_premaration.md](./README_preparation.md)
 
 ```bash
 # メイン統合デモ
-streamlit run a00_responses_api.py --server.port=8510
+streamlit run a00_responses_api.py --server.port=8501
 
 # 構造化出力デモ
-streamlit run a01_structured_outputs_parse_schema.py --server.port=8501
+streamlit run a01_structured_outputs_parse_schema.py --server.port=8502
 
-# Tools・Pydantic Parse デモ
-streamlit run a02_responses_tools_pydantic_parse.py --server.port=8502
+# Tool Use・Function Calling デモ
+streamlit run a02_responses_tools_pydantic_parse.py --server.port=8503
 
 # 画像・ビジョンデモ
-streamlit run a03_images_and_vision.py --server.port=8503
+streamlit run a03_images_and_vision.py --server.port=8504
 
-# 音声処理デモ
-streamlit run a04_audio_speeches.py --server.port=8504
+# 音声処理パターンデモ
+streamlit run a04_audio_speeches.py --server.port=8505
 
 # 会話状態管理デモ
-streamlit run a05_conversation_state.py --server.port=8505
+streamlit run a05_conversation_state.py --server.port=8506
 
 # Chain of Thought デモ
-streamlit run a06_reasoning_chain_of_thought.py --server.port=8506
+streamlit run a06_reasoning_chain_of_thought.py --server.port=8507
 ```
 
 ## 必要な環境変数
 
 ```bash
 # 必須
-export OPENAI_API_KEY='your-openai-api-key'
+export ANTHROPIC_API_KEY='your-anthropic-api-key'
 
 # オプション（一部機能で使用）
 export OPENWEATHER_API_KEY='your-openweather-api-key'
@@ -207,7 +198,8 @@ export EXCHANGERATE_API_KEY='your-exchangerate-api-key'
 
 ・内容　　　　　　　　　　　　　　「リポジトリーURL」
 
-- OpenAI API - 基本・応用：　URL:[openai_api_app](https://github.com/nakashima2toshio/openai_api_app)　このプロジェクトサンプル：6本、API-41パターン
+- Anthropic Claude API - 基本・応用：　このプロジェクト（サンプル：7本、デモパターン：30+）
+- OpenAI API - 基本・応用：　URL:[openai_api_app](https://github.com/nakashima2toshio/openai_api_app)　別リポジトリ
 - RAGの作成と検索：          URL:[openai_rag_app](https://github.com/nakashima2toshio/openai_rag_app)　  別リポジトリ
 - MCPの作成と利用例:         URL:[openai_mcp](https://github.com/nakashima2toshio/open_mcp)　　　   別リポジトリ
 - Agentの作成と利用例:       URL:[openai_agent_app](https://github.com/nakashima2toshio/open_agent_app)　別リポジトリ
@@ -224,15 +216,15 @@ export EXCHANGERATE_API_KEY='your-exchangerate-api-key'
 
 ```bash
 # 1. リポジトリクローン
-git clone https://github.com/nakashima2toshio/openai_api_app.git
-cd openai_api_app
+git clone https://github.com/nakashima2toshio/anthropic_api_jp.git
+cd anthropic_api_jp
 
 # 2. 依存関係インストール
 pip install -r requirements.txt
 
 # 3. 環境変数設定
-export OPENAI_API_KEY='your-api-key'
+export ANTHROPIC_API_KEY='your-api-key'
 
 # 4. 実行
-streamlit run a10_00_responses_api.py
+streamlit run a00_responses_api.py
 ```
