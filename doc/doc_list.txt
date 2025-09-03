@@ -1,27 +1,20 @@
 Memo
-以下のクラスをopenai APIの環境から、anthropic API,anthropic APIの環境に移植しなさい。
-
-SimpleDataExtractionDemo("SimpleDataExtraction"),
-NestedStructureDemo("NestedStructure"),
-EnumTypeDemo("EnumType"),
-NaturalTextStructuredOutputDemo("NaturalTextStructured"),
-MultipleEntityExtractionDemo("MultipleEntityExtraction"),
-ComplexQueryDemo("ComplexQuery"),
-DynamicEnumDemo("DynamicEnum"),
-ChainOfThoughtDemo("ChainOfThought"),
-ConversationHistoryDemo("ConversationHistory"),
-
 
 python -m pip install -r requirements.txt
 
-a*.py のコードを改修したい。
-a00_responses_api.py は、openai_a00_responses_api.py を参考として
-a01_structured_outputs_parse_schema.py　は、openai_a01_structured_outputs_parse_schema.py を参考として
-a02_responses_tools_pydantic_parse.py　は、openai_a02_responses_tools_pydantic_parse.py を参考として
-a03_images_and_vision.py　は、openai_a03_images_and_vision.py を参考として
-a04_audio_speeches.py　は、openai_a04_audio_speeches.py を参考として
-a05_conversation_state.py　は、openai_a05_conversation_state.py を参考として
-a06_reasoning_chain_of_thought.py　は、openai_a06_reasoning_chain_of_thought.py を参考として
+以下のpythonのドキュメントを doc/以下に作成せよ。
+内容は、doc/a10_00_responses_api.md　を参照し作成せよ。
+
+a00_responses_api.py
+a01_structured_outputs_parse_schema.py
+a02_responses_tools_pydantic_parse.py
+a03_images_and_vision.py
+a04_audio_speeches.py
+a05_conversation_state.py
+a06_reasoning_chain_of_thought.py
+
+helper_api.py
+helper_st.py
 
 
 [ヘルパー関数]
