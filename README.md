@@ -1,4 +1,4 @@
-# 🤖 Anthropic Claude API 完全ガイド
+# 🤖 Anthropic API From Scratch with Streamlit
 
 **包括的な学習プロジェクト - スクラッチで Anthropic API + Streamlit**
 
@@ -7,6 +7,18 @@
 [![Streamlit](https://img.shields.io/badge/Streamlit-Framework-red)](https://streamlit.io/)
 
 ---
+## 🔗 関連プロジェクト## 🔗 関連プロジェクト
+
+
+| プロジェクト                                                             | 説明                                         | ステータス |
+| ------------------------------------------------------------------------ | -------------------------------------------- | ---------- |
+| [openai_api_jp](https://github.com/nakashima2toshio/openai_api_jp)       | OpenAI API完全ガイド（本プロジェクト）       | ✅ 公開中  |
+| [anthropic_api_jp](https://github.com/nakashima2toshio/anthropic_api_jp) | Anthropic Claude API活用                     | ✅ 公開中  |
+| [openai_rag_jp](https://github.com/nakashima2toshio/openai_rag_jp)       | RAG実装パターン集（cloud版、Local-Qdrant版） | ✅ 公開中  |
+| [openai_mcp_jp](https://github.com/nakashima2toshio/openai_mcp_jp)       | MCP(Model Context Protocol)実装              | 🚧 整備中  |
+| [openai_django_jp](https://github.com/nakashima2toshio/openai_django_jp) | OpenAI API + Django実装                      | 🚧 整備中  |
+| [openai_agent_jp](https://github.com/nakashima2toshio/openai_agent_jp)   | AIエージェント構築                           | 📝 作成中  |
+
 
 ## 📖 プロジェクト概要
 
@@ -373,16 +385,6 @@ pytest -m slow      # 長時間テスト
 - [Anthropic Claude API Documentation](https://docs.anthropic.com/)
 - [Streamlit Documentation](https://docs.streamlit.io/)
 - [Pydantic Documentation](https://docs.pydantic.dev/)
-
-### 関連プロジェクト
-
-
-| プロジェクト       | 説明                            | リポジトリ                                                           |
-| ------------------ | ------------------------------- | -------------------------------------------------------------------- |
-| **OpenAI API応用** | OpenAI APIの基本・応用実装      | [openai_api_app](https://github.com/nakashima2toshio/openai_api_app) |
-| **RAG実装**        | 検索拡張生成（RAG）の作成と検索 | [openai_rag_app](https://github.com/nakashima2toshio/openai_rag_app) |
-| **MCP実装**        | Model Context Protocol実装例    | [open_mcp](https://github.com/nakashima2toshio/open_mcp)             |
-| **Agent実装**      | 自律型エージェントの作成        | [open_agent_app](https://github.com/nakashima2toshio/open_agent_app) |
 
 ---
 
