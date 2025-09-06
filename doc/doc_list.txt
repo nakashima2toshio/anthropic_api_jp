@@ -1,5 +1,30 @@
 Memo
 
+README.md を最新版に、かつ、doc/以下の資料を統合した資料にアップデートしたい。
+  Anthropic APIの習得を主眼とし、
+  全体構成、記述内容まで、全体的に見直し、作成せよ。
+
+  （1）以下のREADME資料の構成、リンク、1行概要を持つ。
+  　README_preparation.md
+
+[Anthropic API速習]
+a0_simple_api.ipynb
+
+[Anthropic API]
+doc/a00_responses_api.md
+doc/a01_structured_outputs_parse_schema.md
+oc/a02_responses_tools_pydantic_parse.md
+doc/a03_images_and_vision.md
+doc/a04_audio_speeches.md
+doc/a05_conversation_state.md
+doc/a06_reasoning_chain_of_thought.md
+
+[共通]
+doc/helper_api.md
+doc/helper_st.md
+
+
+ーーーーーーーーーーーーーーーーーーーーーーーーーー
 python -m pip install -r requirements.txt
 
 以下のpythonのドキュメントを doc/以下に作成せよ。
