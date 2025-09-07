@@ -1,6 +1,8 @@
 # 🤖 Anthropic API From Scratch with Streamlit
 
-**包括的な学習プロジェクト - スクラッチで Anthropic API + Streamlit**
+## 包括的な学習プロジェクト - スクラッチで Anthropic API + Streamlit
+- If you prefer English, please use translation tools like Google Translate to read the English version.
+
 
 [![Python](https://img.shields.io/badge/Python-3.8%2B-blue)](https://www.python.org/)
 [![Anthropic](https://img.shields.io/badge/Anthropic-Claude%20API-orange)](https://www.anthropic.com/)
