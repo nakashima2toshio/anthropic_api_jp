@@ -1,5 +1,49 @@
 Memo
+---------
+ 詳細内訳
 
+  OpenAI API (doc/openai_api.md)
+
+  メインプログラム（7個）:
+  1. a00_responses_api.py
+  2. a01_structured_outputs_parse_schema.py
+  3. a02_responses_tools_pydantic_parse.py
+  4. a03_images_and_vision.py
+  5. a04_audio_speeches.py
+  6. a05_conversation_state.py
+  7. a06_reasoning_chain_of_thought.py
+
+  サブプログラム数内訳: (49個)
+  - a00: 9個（BaseDemo含む）
+  - a01: 7個
+  - a02: 13個
+  - a03: 4個
+  - a04: 6個
+  - a05: 4個
+  - a06: 6個
+  - 管理クラス: DemoManager（各プログラムに1個）
+
+  Anthropic API (doc/anthropic_api.md)
+
+  メインプログラム（7個）:
+  1. a10_00_responses_api.py
+  2. a10_01_structured_outputs_parse_schema.py
+  3. a10_02_responses_tools_pydantic_parse.py
+  4. a10_03_images_and_vision.py
+  5. a10_04_audio_speeches.py
+  6. a10_05_conversation_state.py
+  7. a10_06_reasoning_chain_of_thought.py
+
+  サブプログラム数内訳: (48個)
+  - a10_00: 9個（StreamingDemo追加）
+  - a10_01: 7個（ChainedExtractionDemo追加）
+  - a10_02: 12個（ChainOfToolsDemo追加）
+  - a10_03: 5個（MultiImageAnalysisDemo追加）
+  - a10_04: 4個（音声系を簡素化）
+  - a10_05: 4個（ConversationSummaryDemo追加）
+  - a10_06: 7個（SelfConsistencyDemo追加）
+  - 管理クラス: DemoManager（各プログラムに1個）
+---------
 README.md を最新版に、かつ、doc/以下の資料を統合した資料にアップデートしたい。
   Anthropic APIの習得を主眼とし、
   全体構成、記述内容まで、全体的に見直し、作成せよ。
