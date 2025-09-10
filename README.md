@@ -8,7 +8,7 @@
 
 ## OpenAI API -> Anthropic API のマイグレーション：仕様書
 [OpenAPAPI->Anthropic API migration 仕様書]
-[Migration](.doc/openai_to_anthropic_migration_spec.md)
+[Migration](doc/openai_to_anthropic_migration_spec.md)
 
 ---
 ## 🔗 関連プロジェクト## 🔗 関連プロジェクト
