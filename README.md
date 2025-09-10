@@ -2,11 +2,13 @@
 
 ## 包括的な学習プロジェクト - スクラッチで Anthropic API + Streamlit
 - If you prefer English, please use translation tools like Google Translate to read the English version.
+#### 主要なAnthropic API(SDK)は網羅しています。
+- プログラム（9個）
+- 巣部プログラム（49個）
 
-
-[![Python](https://img.shields.io/badge/Python-3.8%2B-blue)](https://www.python.org/)
-[![Anthropic](https://img.shields.io/badge/Anthropic-Claude%20API-orange)](https://www.anthropic.com/)
-[![Streamlit](https://img.shields.io/badge/Streamlit-Framework-red)](https://streamlit.io/)
+## OpenAI API -> Anthropic API のマイグレーション：仕様書
+[OpenAPAPI->Anthropic API migration 仕様書]
+[Migration](.doc/openai_to_anthropic_migration_spec.md)
 
 ---
 ## 🔗 関連プロジェクト## 🔗 関連プロジェクト

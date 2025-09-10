@@ -1,8 +1,11 @@
 Memo
 ---------
+anthropic API
+
+---------
  詳細内訳
 
-  OpenAI API (doc/openai_api.md)
+  anthropic API (doc/anthropic_api.md)
 
   メインプログラム（7個）:
   1. a00_responses_api.py
