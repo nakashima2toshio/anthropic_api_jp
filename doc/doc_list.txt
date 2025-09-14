@@ -74,9 +74,7 @@ doc/helper_st.md
 ーーーーーーーーーーーーーーーーーーーーーーーーーー
 python -m pip install -r requirements.txt
 
-以下のpythonのドキュメントを doc/以下に作成せよ。
-内容は、doc/a10_00_responses_api.md　を参照し作成せよ。
-
+下記のテストを作成したい。
 a00_responses_api.py
 a01_structured_outputs_parse_schema.py
 a02_responses_tools_pydantic_parse.py
@@ -85,9 +83,27 @@ a04_audio_speeches.py
 a05_conversation_state.py
 a06_reasoning_chain_of_thought.py
 
+[ヘルパー関数]
 helper_api.py
 helper_st.py
 
+内容は、他のプロジェクトで作成した、
+tests/openai_api_TEST_GUIDE.md
+tests/openai_api_INDIVIDUAL_TEST_GUIDE.md
+を参照し
+まずは、
+a00_responses_api.py　のテストを、
+作成せよ。
+
+
+
+a00_responses_api.py
+a01_structured_outputs_parse_schema.py
+a02_responses_tools_pydantic_parse.py
+a03_images_and_vision.py
+a04_audio_speeches.py
+a05_conversation_state.py
+a06_reasoning_chain_of_thought.py
 
 [ヘルパー関数]
 helper_api.py
