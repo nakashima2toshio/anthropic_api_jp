@@ -21,9 +21,9 @@
 - **カバレージツール**: pytest-cov
 - **モックライブラリ**: unittest.mock
 - **テスト対象**: 7つのAnthropic APIデモモジュール
-- **総テスト数**: 175テスト（予定）
-- **現在の実装**: 24テスト（a00_responses_api.py）
-- **現在のカバレージ**: 28%（a00_responses_api.py）
+- **総テスト数**: 129テスト
+- **実装済みテスト**: 全7モジュール（a00～a06）
+- **目標カバレージ**: 40%以上
 
 ## クイックスタート
 
@@ -48,22 +48,22 @@ open htmlcov/index.html
 
 | ステータス | 数値 |
 |-----------|------|
-| ✅ 成功 | 14 |
-| ❌ 失敗 | 10 |
-| ⏭️ スキップ | 0 |
-| 📈 カバレージ | 28% |
+| ✅ 実装済みモジュール | 7/7 |
+| 📝 総テスト数 | 129 |
+| 🎯 目標カバレージ | 40%+ |
+| 📈 現在のカバレージ | 測定中 |
 
 ## テスト対象モジュール
 
 | モジュール | 説明 | テストファイル | テスト数 | 状態 |
 |-----------|------|---------------|---------|------|
-| `a00_responses_api.py` | 基本的なMessages API | `test_a00_responses_api.py` | 24 | 実装済み |
-| `a01_structured_outputs_parse_schema.py` | 構造化出力とスキーマ検証 | `test_a01_structured_outputs_parse_schema.py` | 27 | 未実装 |
-| `a02_responses_tools_pydantic_parse.py` | PydanticツールとTool Use | `test_a02_responses_tools_pydantic_parse.py` | 23 | 未実装 |
-| `a03_images_and_vision.py` | 画像処理とVision API | `test_a03_images_and_vision.py` | 19 | 未実装 |
-| `a04_audio_speeches.py` | 音声処理（将来対応） | `test_a04_audio_speeches.py` | 24 | 未実装 |
-| `a05_conversation_state.py` | 会話状態管理 | `test_a05_conversation_state.py` | 21 | 未実装 |
-| `a06_reasoning_chain_of_thought.py` | Chain of Thought推論 | `test_a06_reasoning_chain_of_thought.py` | 28 | 未実装 |
+| `a00_responses_api.py` | 基本的なMessages API | `test_a00_responses_api.py` | 24 | ✅ 実装済み |
+| `a01_structured_outputs_parse_schema.py` | 構造化出力とスキーマ検証 | `test_a01_structured_outputs_parse_schema.py` | 19 | ✅ 実装済み |
+| `a02_responses_tools_pydantic_parse.py` | PydanticツールとTool Use | `test_a02_responses_tools_pydantic_parse.py` | 18 | ✅ 実装済み |
+| `a03_images_and_vision.py` | 画像処理とVision API | `test_a03_images_and_vision.py` | 17 | ✅ 実装済み |
+| `a04_audio_speeches.py` | 音声処理（将来対応） | `test_a04_audio_speeches.py` | 17 | ✅ 実装済み |
+| `a05_conversation_state.py` | 会話状態管理 | `test_a05_conversation_state.py` | 18 | ✅ 実装済み |
+| `a06_reasoning_chain_of_thought.py` | Chain of Thought推論 | `test_a06_reasoning_chain_of_thought.py` | 16 | ✅ 実装済み |
 
 ## 環境準備
 
@@ -279,7 +279,7 @@ python -m pytest tests/unit/test_a00_responses_api.py \
 python -m pytest tests/unit/test_a00_responses_api.py::TestTextResponseDemo -v
 ```
 
-### 他のモジュール（実装予定）
+### 他のモジュール（実装済み）
 
 ```bash
 # a01_structured_outputs_parse_schema.py
@@ -426,16 +426,16 @@ test:
 
 ## 現在のテストステータス
 
-| モジュール | テスト数 | 成功 | 失敗 | スキップ | カバレージ |
-|-----------|---------|------|------|---------|-----------|
-| a00_responses_api | 24 | 14 | 10 | 0 | 28% |
-| a01_structured_outputs_parse_schema | - | - | - | - | - |
-| a02_responses_tools_pydantic_parse | - | - | - | - | - |
-| a03_images_and_vision | - | - | - | - | - |
-| a04_audio_speeches | - | - | - | - | - |
-| a05_conversation_state | - | - | - | - | - |
-| a06_reasoning_chain_of_thought | - | - | - | - | - |
-| **合計** | **24** | **14** | **10** | **0** | **28%** |
+| モジュール | テスト数 | 実装状態 | 目標カバレージ |
+|-----------|---------|----------|---------------|
+| a00_responses_api | 24 | ✅ 実装済み | 40% |
+| a01_structured_outputs_parse_schema | 19 | ✅ 実装済み | 50% |
+| a02_responses_tools_pydantic_parse | 18 | ✅ 実装済み | 45% |
+| a03_images_and_vision | 17 | ✅ 実装済み | 60% |
+| a04_audio_speeches | 17 | ✅ 実装済み | 40% |
+| a05_conversation_state | 18 | ✅ 実装済み | 50% |
+| a06_reasoning_chain_of_thought | 16 | ✅ 実装済み | 85% |
+| **合計** | **129** | **7/7** | **40%+** |
 
 ## ベストプラクティス
 

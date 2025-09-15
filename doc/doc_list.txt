@@ -84,7 +84,7 @@ a05_conversation_state.py
 a06_reasoning_chain_of_thought.py
 
 [ヘルパー関数]
-helper_api.py
+helper_api.pyk
 helper_st.py
 
 内容は、他のプロジェクトで作成した、

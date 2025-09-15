@@ -90,6 +90,267 @@ def setup_sidebar_panels(selected_model: str):
 
 
 # ==================================================
+# 会話管理ユーティリティクラス
+# ==================================================
+class ConversationContextManager:
+    """会話コンテキスト管理クラス"""
+    
+    def __init__(self):
+        self.context = {}
+        self.metadata = {}
+    
+    def add_context(self, key: str, value: Any):
+        """コンテキストを追加"""
+        self.context[key] = value
+    
+    def get_context(self, key: str) -> Any:
+        """コンテキストを取得"""
+        return self.context.get(key)
+    
+    def clear_context(self):
+        """コンテキストをクリア"""
+        self.context.clear()
+    
+    def get_all_context(self) -> Dict[str, Any]:
+        """全コンテキストを取得"""
+        return self.context.copy()
+
+
+class ConversationHistoryManager:
+    """会話履歴管理クラス"""
+    
+    def __init__(self, max_length: Optional[int] = None):
+        self.history = []
+        self.max_history = max_length if max_length is not None else 100
+        self.max_length = self.max_history  # エイリアス
+    
+    def add_message(self, role: str, content: str):
+        """メッセージを追加"""
+        self.history.append({
+            "role": role,
+            "content": content,
+            "timestamp": datetime.now().isoformat()
+        })
+        
+        # 最大履歴数を超えたら古いものから削除
+        if len(self.history) > self.max_history:
+            self.history = self.history[-self.max_history:]
+    
+    def get_history(self, limit: Optional[int] = None) -> List[Dict[str, str]]:
+        """会話履歴を取得"""
+        if limit:
+            return self.history[-limit:]
+        return self.history
+    
+    def clear_history(self):
+        """履歴をクリア"""
+        self.history.clear()
+    
+    def export_history(self) -> str:
+        """履歴をJSON形式でエクスポート"""
+        return json.dumps(self.history, ensure_ascii=False, indent=2)
+    
+    def import_history(self, json_str: str):
+        """JSON形式から履歴をインポート"""
+        try:
+            self.history = json.loads(json_str)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Invalid JSON format: {e}")
+
+
+class ConversationStateDemo:
+    """会話状態管理デモクラス"""
+    
+    def __init__(self):
+        self.demo_name = "Conversation State Demo"
+        self.safe_key = sanitize_key(self.demo_name)
+        self.client = None
+        self.session_manager = SessionStateManager()
+        self.context_manager = ConversationContextManager()
+        self.history_manager = ConversationHistoryManager()
+        self.conversation_manager = self.history_manager  # エイリアス
+        self.message_manager = None
+        self.model = "claude-3-haiku-20240307"
+        
+        # Anthropicクライアントの初期化を試みる
+        try:
+            self.client = AnthropicClient()
+            self.message_manager = MessageManagerUI()
+        except Exception as e:
+            logger.warning(f"Failed to initialize client: {e}")
+            if "API key not found" in str(e):
+                if hasattr(st, '_is_running_with_streamlit') and st._is_running_with_streamlit:
+                    st.error("APIキーが見つかりません。環境変数ANTHROPIC_API_KEYを設定してください。")
+                    st.stop()
+                else:
+                    import sys
+                    sys.exit(1)
+    
+    def process_message(self, message: str, model: Optional[str] = None) -> Dict[str, Any]:
+        """メッセージを処理"""
+        if not self.client:
+            return {"error": "Client not initialized"}
+        
+        try:
+            # 履歴にユーザーメッセージを追加
+            self.history_manager.add_message("user", message)
+            
+            # メッセージを送信
+            messages = self.history_manager.get_history(limit=10)
+            response = self.client.client.messages.create(
+                model=model or self.model,
+                messages=messages,
+                max_tokens=1024
+            )
+            
+            # 履歴にアシスタントの応答を追加
+            response_text = response.content[0].text if response.content else ""
+            self.history_manager.add_message("assistant", response_text)
+            
+            return {
+                "response": response,
+                "text": response_text,
+                "history": self.history_manager.get_history()
+            }
+            
+        except Exception as e:
+            return {"error": str(e)}
+    
+    def process_message_with_context(self, message: str, include_context: bool = False) -> Dict[str, Any]:
+        """コンテキスト付きメッセージ処理"""
+        if include_context:
+            # コンテキストを追加
+            context = self.context_manager.get_all_context()
+            if context:
+                message = f"[Context: {context}]\n{message}"
+        
+        return self.process_message(message)
+    
+    def run_basic_conversation_demo(self):
+        """基本的な会話デモを実行"""
+        st.write("### 基本的な会話デモ")
+        self.run()
+    
+    def run_context_aware_conversation_demo(self):
+        """コンテキスト認識会話デモを実行"""
+        st.write("### コンテキスト認識会話デモ")
+        # コンテキストを設定
+        self.context_manager.add_context("mode", "context_aware")
+        self.run()
+    
+    def run_conversation_history_management_demo(self):
+        """会話履歴管理デモを実行"""
+        st.write("### 会話履歴管理デモ")
+        self.run()
+    
+    def run_multi_session_demo(self):
+        """マルチセッションデモを実行"""
+        st.write("### マルチセッションデモ")
+        self.run()
+    
+    def save_state(self, filepath: str):
+        """会話状態を保存"""
+        state = {
+            "history": self.history_manager.get_history(),
+            "context": self.context_manager.get_all_context(),
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(state, f, ensure_ascii=False, indent=2)
+    
+    def save_conversation(self, filepath):
+        """会話の保存（エイリアス）"""
+        self.save_state(str(filepath))
+    
+    def load_state(self, filepath: str):
+        """会話状態を読み込み"""
+        with open(filepath, 'r', encoding='utf-8') as f:
+            state = json.load(f)
+        
+        # 履歴を復元
+        if "history" in state:
+            self.history_manager.history = state["history"]
+        
+        # コンテキストを復元
+        if "context" in state:
+            self.context_manager.context = state["context"]
+    
+    def load_conversation(self, filepath):
+        """会話の読み込み（エイリアス）"""
+        self.load_state(str(filepath))
+    
+    def execute(self, selected_model: Optional[str] = None):
+        """デモの実行（統一インターフェース）"""
+        if selected_model:
+            self.model = selected_model
+        self.run()
+    
+    def run(self):
+        """デモを実行"""
+        st.write("## 会話状態管理デモ")
+        
+        # モデル選択
+        model = UIHelper.select_model("conversation_model")
+        self.model = model
+        
+        # 入力
+        user_input = st.text_area(
+            "メッセージを入力",
+            height=100,
+            key="conversation_input"
+        )
+        
+        if st.button("送信", key="conversation_submit"):
+            if user_input:
+                result = self.process_message(user_input, self.model)
+                
+                if "error" in result:
+                    st.error(f"エラー: {result['error']}")
+                else:
+                    st.success("メッセージを送信しました")
+                    
+                    # 応答を表示
+                    if "text" in result:
+                        st.write("### アシスタントの応答")
+                        st.write(result["text"])
+        
+        # 履歴表示
+        if st.button("履歴を表示", key="show_history"):
+            history = self.history_manager.get_history()
+            if history:
+                st.write("### 会話履歴")
+                for msg in history:
+                    role = "👤 ユーザー" if msg["role"] == "user" else "🤖 アシスタント"
+                    st.write(f"{role}: {msg['content']}")
+            else:
+                st.info("履歴はありません")
+
+
+# 会話状態の保存・読み込み関数
+def save_conversation_state(conversation_history: List[Dict[str, str]], filepath: str):
+    """会話状態を保存"""
+    state = {
+        "history": conversation_history,
+        "timestamp": datetime.now().isoformat()
+    }
+    
+    with open(filepath, 'w', encoding='utf-8') as f:
+        json.dump(state, f, ensure_ascii=False, indent=2)
+
+
+def load_conversation_state(filepath: str) -> Optional[List[Dict[str, str]]]:
+    """会話状態を読み込み"""
+    try:
+        with open(filepath, 'r', encoding='utf-8') as f:
+            state = json.load(f)
+        return state.get("history", [])
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        logger.warning(f"Failed to load conversation state: {e}")
+        return None if isinstance(e, FileNotFoundError) else []
+
+
+# ==================================================
 # ベースデモクラス（統一化版）
 # ==================================================
 class BaseDemo(ABC):
