@@ -855,7 +855,7 @@ class InfoPanelManager:
             limits = TokenManager.get_model_limits(selected_model)
             pricing = config.get("model_pricing", {}).get(selected_model, {})
 
-            col1, col2 = st.columns(2)
+            col1, col2 = st.sidebar.columns(2)
             with col1:
                 st.write("最大入力", f"{limits['max_tokens']:,}")
             with col2:

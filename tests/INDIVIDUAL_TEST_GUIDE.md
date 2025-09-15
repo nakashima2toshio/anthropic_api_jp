@@ -1,6 +1,7 @@
 # Anthropic API デモ 個別モジュールテストガイド
 
-# 2. カバレージ付きテスト（推奨）
+# 2. カバレージ付きテスト（ALL Test）
+
 pytest --cov --cov-report=term-missing
 
 ## 🚀 クイックテストコマンド
@@ -70,6 +71,7 @@ python -m pytest tests/unit/test_a06_reasoning_chain_of_thought.py \
 - **成功率**: 58% (14/24)
 
 ### テストクラス一覧
+
 
 | クラス名                 | テスト内容                 | テスト数 | 状態 |
 | ------------------------ | -------------------------- | -------- | ---- |
@@ -141,14 +143,15 @@ python -m pytest tests/unit/test_a00_responses_api.py::TestBaseDemo::test_base_d
 
 ### テストクラス一覧
 
-| クラス名                     | テスト内容                   | テスト数 | 状態 |
-| ---------------------------- | ---------------------------- | -------- | ---- |
-| TestPageConfig               | ページ設定のテスト           | 2        | ✅   |
-| TestPydanticModels           | Pydanticモデルのテスト       | 3        | ✅   |
-| TestStructuredOutputDemo     | 構造化出力デモのテスト       | 4        | ✅   |
-| TestDemoScenarios            | デモシナリオのテスト         | 3        | ✅   |
-| TestMainApp                  | メインアプリのテスト         | 2        | ✅   |
-| TestIntegration              | 統合テスト                   | 1        | ✅   |
+
+| クラス名                 | テスト内容             | テスト数 | 状態 |
+| ------------------------ | ---------------------- | -------- | ---- |
+| TestPageConfig           | ページ設定のテスト     | 2        | ✅   |
+| TestPydanticModels       | Pydanticモデルのテスト | 3        | ✅   |
+| TestStructuredOutputDemo | 構造化出力デモのテスト | 4        | ✅   |
+| TestDemoScenarios        | デモシナリオのテスト   | 3        | ✅   |
+| TestMainApp              | メインアプリのテスト   | 2        | ✅   |
+| TestIntegration          | 統合テスト             | 1        | ✅   |
 
 ### Pydanticモデル一覧
 
@@ -208,17 +211,18 @@ Pydanticツールと関数呼び出し（Tool Use）を使用したデモモジ�
 
 ### テストクラス一覧
 
-| クラス名                 | テスト内容                   | テスト数 | 状態 |
-| ------------------------ | ---------------------------- | -------- | ---- |
-| TestPageConfig           | ページ設定のテスト           | 1        | ✅   |
-| TestToolDefinitions      | ツール定義のテスト           | 3        | ✅   |
-| TestPydanticModels       | Pydanticモデルのテスト       | 3        | ✅   |
-| TestToolHandlers         | ツールハンドラーのテスト     | 3        | ✅   |
-| TestToolsDemo            | ToolsDemoクラスのテスト      | 2        | ✅   |
-| TestDemoScenarios        | デモシナリオのテスト         | 4        | ✅   |
-| TestErrorHandling        | エラーハンドリングのテスト   | 2        | ✅   |
-| TestMainApp              | メインアプリのテスト         | 2        | ✅   |
-| TestIntegration          | 統合テスト                   | 1        | ✅   |
+
+| クラス名            | テスト内容                 | テスト数 | 状態 |
+| ------------------- | -------------------------- | -------- | ---- |
+| TestPageConfig      | ページ設定のテスト         | 1        | ✅   |
+| TestToolDefinitions | ツール定義のテスト         | 3        | ✅   |
+| TestPydanticModels  | Pydanticモデルのテスト     | 3        | ✅   |
+| TestToolHandlers    | ツールハンドラーのテスト   | 3        | ✅   |
+| TestToolsDemo       | ToolsDemoクラスのテスト    | 2        | ✅   |
+| TestDemoScenarios   | デモシナリオのテスト       | 4        | ✅   |
+| TestErrorHandling   | エラーハンドリングのテスト | 2        | ✅   |
+| TestMainApp         | メインアプリのテスト       | 2        | ✅   |
+| TestIntegration     | 統合テスト                 | 1        | ✅   |
 
 ### ツール定義一覧
 
@@ -256,15 +260,16 @@ Pydanticツールと関数呼び出し（Tool Use）を使用したデモモジ�
 
 ### テストクラス一覧
 
-| クラス名                | テスト内容                         | テスト数 | 状態 |
-| ----------------------- | ---------------------------------- | -------- | ---- |
-| TestPageConfig          | ページ設定のテスト                 | 1        | ✅   |
-| TestImageUtilities      | 画像処理ユーティリティのテスト     | 3        | ✅   |
-| TestImageVisionDemo     | ImageVisionDemoクラスのテスト      | 2        | ✅   |
-| TestDemoScenarios       | デモシナリオのテスト               | 4        | ✅   |
-| TestErrorHandling       | エラーハンドリングのテスト         | 3        | ✅   |
-| TestMainApp             | メインアプリのテスト               | 2        | ✅   |
-| TestIntegration         | 統合テスト                         | 1        | ✅   |
+
+| クラス名            | テスト内容                     | テスト数 | 状態 |
+| ------------------- | ------------------------------ | -------- | ---- |
+| TestPageConfig      | ページ設定のテスト             | 1        | ✅   |
+| TestImageUtilities  | 画像処理ユーティリティのテスト | 3        | ✅   |
+| TestImageVisionDemo | ImageVisionDemoクラスのテスト  | 2        | ✅   |
+| TestDemoScenarios   | デモシナリオのテスト           | 4        | ✅   |
+| TestErrorHandling   | エラーハンドリングのテスト     | 3        | ✅   |
+| TestMainApp         | メインアプリのテスト           | 2        | ✅   |
+| TestIntegration     | 統合テスト                     | 1        | ✅   |
 
 ### API使用一覧
 
@@ -295,15 +300,16 @@ Pydanticツールと関数呼び出し（Tool Use）を使用したデモモジ�
 
 ### テストクラス一覧
 
-| クラス名                | テスト内容                   | テスト数 | 状態 |
-| ----------------------- | ---------------------------- | -------- | ---- |
-| TestPageConfig          | ページ設定のテスト           | 1        | ✅   |
-| TestAudioUtilities      | 音声処理ユーティリティのテスト | 3        | ✅   |
-| TestAudioSpeechesDemo   | AudioSpeechesDemoクラスのテスト | 2        | ✅   |
-| TestDemoScenarios       | デモシナリオのテスト         | 4        | ✅   |
-| TestErrorHandling       | エラーハンドリングのテスト   | 3        | ✅   |
-| TestMainApp             | メインアプリのテスト         | 2        | ✅   |
-| TestIntegration         | 統合テスト                   | 1        | ✅   |
+
+| クラス名              | テスト内容                      | テスト数 | 状態 |
+| --------------------- | ------------------------------- | -------- | ---- |
+| TestPageConfig        | ページ設定のテスト              | 1        | ✅   |
+| TestAudioUtilities    | 音声処理ユーティリティのテスト  | 3        | ✅   |
+| TestAudioSpeechesDemo | AudioSpeechesDemoクラスのテスト | 2        | ✅   |
+| TestDemoScenarios     | デモシナリオのテスト            | 4        | ✅   |
+| TestErrorHandling     | エラーハンドリングのテスト      | 3        | ✅   |
+| TestMainApp           | メインアプリのテスト            | 2        | ✅   |
+| TestIntegration       | 統合テスト                      | 1        | ✅   |
 
 ### 機能一覧
 
@@ -334,16 +340,17 @@ Pydanticツールと関数呼び出し（Tool Use）を使用したデモモジ�
 
 ### テストクラス一覧
 
-| クラス名                     | テスト内容                         | テスト数 | 状態 |
-| ---------------------------- | ---------------------------------- | -------- | ---- |
-| TestPageConfig               | ページ設定のテスト                 | 1        | ✅   |
-| TestConversationUtilities    | 会話状態管理ユーティリティのテスト | 3        | ✅   |
-| TestConversationStateDemo    | ConversationStateDemoクラスのテスト | 2        | ✅   |
-| TestDemoScenarios            | デモシナリオのテスト               | 4        | ✅   |
-| TestStateManagement          | 状態管理機能のテスト               | 2        | ✅   |
-| TestErrorHandling            | エラーハンドリングのテスト         | 2        | ✅   |
-| TestMainApp                  | メインアプリのテスト               | 2        | ✅   |
-| TestIntegration              | 統合テスト                         | 1        | ✅   |
+
+| クラス名                  | テスト内容                          | テスト数 | 状態 |
+| ------------------------- | ----------------------------------- | -------- | ---- |
+| TestPageConfig            | ページ設定のテスト                  | 1        | ✅   |
+| TestConversationUtilities | 会話状態管理ユーティリティのテスト  | 3        | ✅   |
+| TestConversationStateDemo | ConversationStateDemoクラスのテスト | 2        | ✅   |
+| TestDemoScenarios         | デモシナリオのテスト                | 4        | ✅   |
+| TestStateManagement       | 状態管理機能のテスト                | 2        | ✅   |
+| TestErrorHandling         | エラーハンドリングのテスト          | 2        | ✅   |
+| TestMainApp               | メインアプリのテスト                | 2        | ✅   |
+| TestIntegration           | 統合テスト                          | 1        | ✅   |
 
 ### 主要機能
 
@@ -374,15 +381,16 @@ Chain of Thought（CoT）推論パターンを実装したデモモジュール
 
 ### テストクラス一覧
 
-| クラス名                      | テスト内容                   | テスト数 | 状態 |
-| ----------------------------- | ---------------------------- | -------- | ---- |
-| TestPageConfig                | ページ設定のテスト           | 1        | ✅   |
-| TestChainOfThoughtUtilities   | CoT処理ユーティリティのテスト | 3        | ✅   |
-| TestChainOfThoughtDemo        | ChainOfThoughtDemoクラスのテスト | 2        | ✅   |
-| TestDemoScenarios             | デモシナリオのテスト         | 4        | ✅   |
-| TestErrorHandling             | エラーハンドリングのテスト   | 2        | ✅   |
-| TestMainApp                   | メインアプリのテスト         | 2        | ✅   |
-| TestIntegration               | 統合テスト                   | 1        | ✅   |
+
+| クラス名                    | テスト内容                       | テスト数 | 状態 |
+| --------------------------- | -------------------------------- | -------- | ---- |
+| TestPageConfig              | ページ設定のテスト               | 1        | ✅   |
+| TestChainOfThoughtUtilities | CoT処理ユーティリティのテスト    | 3        | ✅   |
+| TestChainOfThoughtDemo      | ChainOfThoughtDemoクラスのテスト | 2        | ✅   |
+| TestDemoScenarios           | デモシナリオのテスト             | 4        | ✅   |
+| TestErrorHandling           | エラーハンドリングのテスト       | 2        | ✅   |
+| TestMainApp                 | メインアプリのテスト             | 2        | ✅   |
+| TestIntegration             | 統合テスト                       | 1        | ✅   |
 
 ### 推論パターン一覧
 
@@ -438,18 +446,19 @@ def test_error_handling(mock_error):
 ### よくある問題
 
 1. **ImportError**:
+
    - 解決: `export PYTHONPATH=$PYTHONPATH:$(pwd)`
-
 2. **モックの不具合**:
+
    - 解決: `@patch`の順序を確認（下から上へ適用）
-
 3. **セッション状態エラー**:
+
    - 解決: `st.session_state`に必要なキーを事前に設定
-
 4. **デコレータのモック**:
-   - 解決: デコレータを含む関数全体をモック
 
+   - 解決: デコレータを含む関数全体をモック
 5. **カバレージが低い**:
+
    - 解決: `--cov-report=term-missing`で未カバー行を確認
 
 ## ベストプラクティス
